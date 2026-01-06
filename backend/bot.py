@@ -324,7 +324,14 @@ async def process_deposit_final_confirm(callback: types.CallbackQuery, state: FS
     
     # Download file to memory/temp buffer
     downloaded_file = await bot.download_file(file_info.file_path)
-    file_bytes = downloaded_file.read()
+    # downloaded_file is a BytesIO object. read() might handle it if seek is at 0, 
+    # but to be safe with io.BytesIO from aiogram, we use getvalue() or seek(0)
+    if hasattr(downloaded_file, 'getvalue'):
+        file_bytes = downloaded_file.getvalue()
+    else:
+        # Fallback if it's a different stream type
+        downloaded_file.seek(0)
+        file_bytes = downloaded_file.read()
 
     try:
         # Upload to Supabase Storage
