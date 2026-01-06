@@ -77,11 +77,20 @@ app.add_middleware(
 from aiogram.types import Update
 
 @app.post(WEBHOOK_PATH)
-async def bot_webhook(update: Update):
+@app.post(WEBHOOK_PATH)
+async def bot_webhook(update: dict):
     """
     Handler for Telegram Webhook updates
     """
-    return await dp.feed_update(bot, update)
+    print(f"📥 Received Webhook Update: {update}")
+    try:
+        # Convert dict to aiogram Update object manually to debug validation errors
+        aiogram_update = Update(**update)
+        return await dp.feed_update(bot, aiogram_update)
+    except Exception as e:
+        print(f"❌ Error processing webhook: {e}")
+        # Return 200 OK anyway to stop Telegram from retrying endlessly
+        return {"status": "error", "message": str(e)}
 
 # Add CORS middleware to allow frontend dev server
 app.add_middleware(
