@@ -16,7 +16,14 @@ if not DB_URL:
 if "postgresql" in DB_URL and "asyncpg" not in DB_URL:
     DB_URL = DB_URL.replace("postgresql://", "postgresql+asyncpg://")
 
-engine = create_async_engine(DB_URL, echo=True)
+engine = create_async_engine(
+    DB_URL, 
+    echo=True,
+    pool_size=20,          # Increase pool size to handle concurrent requests
+    max_overflow=10,       # Allow up to 10 additional connections beyond pool_size
+    pool_pre_ping=True,    # Verify connections before using them
+    pool_recycle=3600      # Recycle connections every hour to prevent stale connections
+)
 async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 async def init_db():
