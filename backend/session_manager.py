@@ -99,7 +99,6 @@ class TelegramSessionManager:
             await client.start()
             
             # Verify who we are logged in as (Best effort, ignore FLOOD_WAIT)
-            try:
             # CLEANUP: Remove old sessions to free memory (Render has 512MB limit)
             await self.cleanup_stale_sessions()
             
