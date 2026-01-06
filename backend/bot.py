@@ -1392,15 +1392,22 @@ async def process_manage_session(callback: types.CallbackQuery):
                 
                 status_icon = "🟢" if is_current else "⚪"
                 
-                # Info text
-                text += f"{status_icon} <b>{device_name}</b>\n"
-                text += f"   ├ IP: {ip}\n"
-                text += f"   └ ID: <code>{sess['hash']}</code>\n\n"
-                
+                # Build device button with X for removal
                 if not is_current:
-                    # Allow revoking other sessions
-                    btn_text = f"❌ Kill {sess['device_model'][:10]}..."
-                    builder.row(InlineKeyboardButton(text=btn_text, callback_data=f"kill_sess_{purchase_id}_{sess['hash']}"))
+                    # Format: "Device Name     ❌"
+                    btn_text = f"{sess['device_model'][:20]}... ❌"
+                    builder.row(InlineKeyboardButton(
+                        text=btn_text,
+                        callback_data=f"kill_sess_{purchase_id}_{sess['hash']}"
+                    ))
+                    text += f"{status_icon} {device_name}\n"
+                    text += f"   └ IP: {ip}\n\n"
+                else:
+                    # Current session - no delete button
+                    text += f"{status_icon} {device_name} (Current)\n"
+                    text += f"   └ IP: {ip}\n\n"
+            
+            text += f"💡 <i>Tap ❌ to remove a device</i>\n"
             
             builder.row(InlineKeyboardButton(text="🔄 Refresh", callback_data=f"manage_sess_{purchase_id}"))
             builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="btn_purchases"))
