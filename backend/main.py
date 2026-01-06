@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import asyncio
 import os
+from fastapi import UploadFile, File, Form
 
 # --- Schemas ---
 class CountryCreate(BaseModel):
