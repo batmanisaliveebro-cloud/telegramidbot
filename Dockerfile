@@ -22,5 +22,13 @@ RUN chmod -R 777 /app
 # Expose port 7860 (Hugging Face default)
 EXPOSE 7860
 
-# Start command
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "backend.main:app", "--bind", "0.0.0.0:7860", "--timeout", "120"]
+# Start command with optimized workers
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "backend.main:app", \
+     "--bind", "0.0.0.0:7860", \
+     "--workers", "4", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--keep-alive", "5", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]

@@ -76,6 +76,33 @@ app = FastAPI(lifespan=lifespan)
 async def health_check():
     return {"status": "ok", "mode": "webhook", "service": "Telegram Bot Backend"}
 
+@app.get("/health")
+async def detailed_health():
+    """Detailed health check with database and webhook verification"""
+    health_status = {"status": "healthy", "checks": {}}
+    
+    # Check database connection
+    try:
+        async with async_session() as session:
+            await session.execute(select(User).limit(1))
+        health_status["checks"]["database"] = "ok"
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["checks"]["database"] = f"error: {str(e)[:100]}"
+    
+    # Check webhook
+    try:
+        info = await bot.get_webhook_info()
+        health_status["checks"]["webhook"] = {
+            "url": info.url,
+            "pending_updates": info.pending_update_count
+        }
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["checks"]["webhook"] = f"error: {str(e)[:100]}"
+    
+    return health_status
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,

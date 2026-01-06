@@ -131,8 +131,11 @@ async def cmd_start(message: types.Message):
         reply_markup=get_main_menu(is_admin=is_admin),
         parse_mode="HTML"
     )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Error sending start message: {e}")
+        # Fallback response if main message fails
+        try:
+            await message.answer("Welcome! The bot is ready. Type /start to begin.")
 
 @dp.callback_query(F.data == "btn_deposit")
 async def process_deposit_start(callback: types.CallbackQuery, state: FSMContext):
