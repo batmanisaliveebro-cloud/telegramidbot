@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     
     # Set Webhook on Startup
     webhook_url = f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}"
-    print(f"Setting webhook to: {webhook_url}")
+    print(f"Setting webhook to: {webhook_url}", flush=True)
     await bot.set_webhook(
         url=webhook_url,
         allowed_updates=dp.resolve_used_update_types(),
