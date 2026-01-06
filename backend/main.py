@@ -36,9 +36,9 @@ class LoginRequest(BaseModel):
 
 # Webhook Configuration
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_PATH = "/webhook"
-# BASE_URL from env var (for Railway/Render), default to Render URL if missing
-BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", "https://telegram-bot-full-e5lj.onrender.com")
+# BASE_URL from env var (for Railway/Render), default to actual Koyeb URL if missing
+# This is the PERMANENT FIX ensuring webhook is always set correct on boot
+BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", "https://shallow-reggie-telegrambotmine-8d891f24.koyeb.app")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
