@@ -34,6 +34,10 @@ class DepositUpdate(BaseModel):
 class LoginRequest(BaseModel):
     password: str
 
+class BalanceAdjustment(BaseModel):
+    amount: float
+    reason: str  # "admin_add" or "admin_deduct"
+
 # Webhook Configuration
 WEBHOOK_PATH = "/webhook"
 # BASE_URL from env var (for Railway/Render), default to actual Koyeb URL if missing
@@ -250,6 +254,62 @@ async def update_deposit(deposit_id: int, update_data: DepositUpdate):
         
         await session.commit()
         return deposit
+
+@app.post("/admin/users/{user_id}/adjust-balance")
+async def adjust_user_balance(user_id: int, adjustment: BalanceAdjustment):
+    async with async_session() as session:
+        # Get user
+        stmt = select(User).where(User.id == user_id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update balance
+        old_balance = user.balance
+        user.balance += adjustment.amount
+        new_balance = user.balance
+        
+        await session.commit()
+        
+        # Send notification to user via bot
+        try:
+            if adjustment.reason == "admin_add":
+                message = (
+                    f"✅ <b>Balance Credited</b>\n\n"
+                    f"💰 Amount: ₹{abs(adjustment.amount)}\n"
+                    f"📊 Previous Balance: ₹{old_balance}\n"
+                    f"💵 New Balance: ₹{new_balance}\n\n"
+                    f"<i>Balance added by admin</i>"
+                )
+            elif adjustment.reason == "admin_deduct":
+                message = (
+                    f"⚠️ <b>Balance Debited</b>\n\n"
+                    f"💰 Amount: ₹{abs(adjustment.amount)}\n"
+                    f"📊 Previous Balance: ₹{old_balance}\n"
+                    f"💵 New Balance: ₹{new_balance}\n\n"
+                    f"<i>Balance deducted by admin</i>"
+                )
+            else:
+                message = (
+                    f"💳 <b>Balance Updated</b>\n\n"
+                    f"💰 Change: ₹{adjustment.amount}\n"
+                    f"📊 Previous Balance: ₹{old_balance}\n"
+                    f"💵 New Balance: ₹{new_balance}"
+                )
+            
+            await bot.send_message(
+                user.telegram_id,
+                message,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            # Log error but don't fail the request
+            print(f"Failed to send notification: {e}")
+        
+        return {"status": "success", "user": user, "new_balance": new_balance}
+
 
 @app.get("/admin/users")
 async def get_users():
