@@ -136,6 +136,8 @@ async def cmd_start(message: types.Message):
         # Fallback response if main message fails
         try:
             await message.answer("Welcome! The bot is ready. Type /start to begin.")
+        except Exception:
+            pass  # If even fallback fails, log it but don't crash
 
 @dp.callback_query(F.data == "btn_deposit")
 async def process_deposit_start(callback: types.CallbackQuery, state: FSMContext):
