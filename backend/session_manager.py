@@ -18,11 +18,15 @@ class TelegramSessionManager:
         self.active_clients: Dict[str, Client] = {}
         self.otp_cache: Dict[str, dict] = {}  # phone -> {code, timestamp}
         self.login_status: Dict[str, bool] = {}  # phone -> is_logged_in
+        self.monitoring_start_times: Dict[str, datetime] = {} # phone -> start_time
         
     async def start_monitoring(self, phone_number: str, session_string: str):
         """Start monitoring a Telegram session for OTP codes"""
         if phone_number in self.active_clients:
             print(f"Already monitoring {phone_number}")
+            # Reset start time on re-monitor request to be safe, or keep old?
+            # Better to update it so we don't catch old messages if restarted
+            self.monitoring_start_times[phone_number] = datetime.now()
             return
         
         try:
@@ -212,10 +216,14 @@ class TelegramSessionManager:
                         # Telegram usually sends: "New login", "Login code", etc.
                         # If we see a login notification that is VERY recent (last 2 mins), it's likely the user
                         if "login" in text and ("new" in text or "device" in text or "successfully" in text):
-                            if datetime.now() - message.date < timedelta(minutes=10):
+                            # Only accept if message is NEWER than when we started monitoring
+                            start_time = self.monitoring_start_times.get(phone_number, datetime.min)
+                            if message.date > start_time:
                                 found_login = True
                                 print(f"✅ DETECTED NEW LOGIN MSG: {text[:50]}...")
                                 break
+                            else:
+                                print(f"⚠️ Ignoring old login msg from {message.date} (Started: {start_time})")
                     
                     if found_login:
                         self.login_status[phone_number] = True
