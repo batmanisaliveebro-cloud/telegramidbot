@@ -53,9 +53,6 @@ def get_main_menu(is_admin=False):
         InlineKeyboardButton(text="🆘 Support", callback_data="btn_help")
     )
     
-    # Row 3: Contact Developer
-    builder.row(InlineKeyboardButton(text="👨‍💻 Contact Developer", url="https://t.me/akhilportal"))
-    
     # Row 4: Main Menu
     builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
