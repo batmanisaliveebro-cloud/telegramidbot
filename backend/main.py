@@ -463,16 +463,104 @@ async def verify_session_otp(req: SessionVerifyOTPRequest):
 
 @app.post("/admin/session/verify-2fa")
 async def verify_session_2fa(req: SessionVerify2FARequest):
-    """Verify 2FA password and get session string"""
+    """Verify 2FA password"""
     try:
         generator = get_session_generator()
-        result = await generator.verify_2fa(
-            session_id=req.session_id,
-            password=req.password
-        )
+        result = await generator.submit_2fa(req.session_id, req.password)
         return result
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+# --- Payment Settings Endpoints ---
+
+@app.get("/admin/settings/payment")
+async def get_payment_settings():
+    """Get current UPI ID and QR Code URL"""
+    try:
+        async with async_session() as session:
+            # Fetch UPI ID
+            upi_stmt = select(Settings).where(Settings.key == "payment_upi_id")
+            upi_res = await session.execute(upi_stmt)
+            upi_setting = upi_res.scalar_one_or_none()
+            
+            # Fetch QR Image URL
+            qr_stmt = select(Settings).where(Settings.key == "payment_qr_image")
+            qr_res = await session.execute(qr_stmt)
+            qr_setting = qr_res.scalar_one_or_none()
+            
+            return {
+                "upi_id": upi_setting.value if upi_setting else "",
+                "qr_image": qr_setting.value if qr_setting else ""
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/admin/settings/payment")
+async def update_payment_settings(
+    upi_id: str = Form(...),
+    qr_image: UploadFile = File(None)
+):
+    """Update UPI ID and optionally upload new QR Code"""
+    try:
+        async with async_session() as session:
+            # Update UPI ID
+            upi_stmt = select(Settings).where(Settings.key == "payment_upi_id")
+            upi_res = await session.execute(upi_stmt)
+            upi_setting = upi_res.scalar_one_or_none()
+            
+            if not upi_setting:
+                upi_setting = Settings(key="payment_upi_id", value=upi_id)
+                session.add(upi_setting)
+            else:
+                upi_setting.value = upi_id
+            
+            # Handle QR Image Upload if provided
+            if qr_image:
+                print(f"Uploading new QR Code: {qr_image.filename}")
+                content = await qr_image.read()
+                
+                # Upload to Supabase
+                from supabase import create_client
+                supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+                
+                file_ext = qr_image.filename.split(".")[-1]
+                file_path = f"payment_qr_{int(asyncio.get_event_loop().time())}.{file_ext}"
+                
+                # Ensure bucket exists (created in task plan)
+                bucket_name = "bot-uploads"
+                
+                try:
+                    res = supabase.storage.from_(bucket_name).upload(
+                        file_path,
+                        content,
+                        {"content-type": qr_image.content_type}
+                    )
+                    
+                    # Get Public URL
+                    public_url = supabase.storage.from_(bucket_name).get_public_url(file_path)
+                    print(f"QR Uploaded to: {public_url}")
+                    
+                    # Update DB
+                    qr_stmt = select(Settings).where(Settings.key == "payment_qr_image")
+                    qr_res = await session.execute(qr_stmt)
+                    qr_setting = qr_res.scalar_one_or_none()
+                    
+                    if not qr_setting:
+                        qr_setting = Settings(key="payment_qr_image", value=public_url)
+                        session.add(qr_setting)
+                    else:
+                        qr_setting.value = public_url
+                        
+                except Exception as upload_err:
+                    print(f"Upload Error: {upload_err}")
+                    raise HTTPException(status_code=500, detail=f"Failed to upload QR: {upload_err}")
+
+            await session.commit()
+            return {"success": True, "message": "Payment settings updated"}
+            
+    except Exception as e:
+        print(f"Error updating settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Settings API ---
 
