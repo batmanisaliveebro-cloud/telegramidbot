@@ -107,10 +107,16 @@ async def cmd_start(message: types.Message):
             
     except Exception as e:
         logger.error(f"Error in /start handler: {e}")
-        # Even if DB fails, we want to try show the menu
+        # DEBUG: Tell the user what happened so we can diagnose "no reply" issues
+        if should_be_admin: # Only show details to admin if possible, or just show everyone for now
+             await message.answer(f"⚠️ <b>System Error during Login:</b>\n<code>{str(e)}</code>", parse_mode="HTML")
+        # Even if DB fails, we want to try show the menu if possible, or maybe stop here?
     
-    await message.answer(
-        f"<b>👋 Hello {message.from_user.full_name}, Welcome to our Premium Store!</b>\n\n"
+    # Ensure is_admin has a value even if DB failed (False)
+    # If DB failed, this might fail too if get_main_menu relies on DB? No it doesn't.
+    try:
+        await message.answer(
+            f"<b>👋 Hello {message.from_user.full_name}, Welcome to our Premium Store!</b>\n\n"
         "⚡ <b>Instant Delivery | High Quality | 24/7 Support</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "🛒 <b>Best Place to Buy:</b>\n"
