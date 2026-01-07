@@ -1092,7 +1092,7 @@ async def process_get_otp(callback: types.CallbackQuery):
             
         except Exception as e:
             logger.error(f"Error starting OTP monitoring: {e}")
-            # Send error as new message instead of editing
+            # Send error as new message instead of editing (CRITICAL FIX)
             try:
                 await bot.send_message(
                     callback.message.chat.id,
@@ -1104,9 +1104,9 @@ async def process_get_otp(callback: types.CallbackQuery):
                         .as_markup(),
                     parse_mode="HTML"
                 )
-            except Exception as edit_error:
-                # If message edit fails (e.g., "message not modified"), just log it
-                logger.error(f"Could not edit error message: {edit_error}")
+            except Exception as send_err:
+                logger.error(f"Could not send error message: {send_err}")
+                await callback.answer("❌ Error occurred. Please try again.", show_alert=True)
 
 
 async def show_otp_waiting(message: types.Message, phone_number: str, purchase_id: int, attempt: int = 0):
