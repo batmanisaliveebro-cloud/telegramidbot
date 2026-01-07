@@ -116,6 +116,10 @@ app.add_middleware(
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 import time
+import logging
+
+# Get logger for middleware
+middleware_logger = logging.getLogger(__name__)
 
 class TimeoutMiddleware(BaseHTTPMiddleware):
     """
@@ -131,14 +135,14 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             response.headers["X-Process-Time"] = str(process_time)
             return response
         except asyncio.TimeoutError:
-            logger.error(f"Request timeout: {request.url.path}")
+            middleware_logger.error(f"Request timeout: {request.url.path}")
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=504,
                 content={"detail": "Request processing timeout. Please try again."}
             )
         except Exception as e:
-            logger.error(f"Request error: {e}")
+            middleware_logger.error(f"Request error: {e}")
             from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=500,
@@ -146,6 +150,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             )
 
 app.add_middleware(TimeoutMiddleware)
+
 
 # Webhook Handler
 from aiogram.types import Update
