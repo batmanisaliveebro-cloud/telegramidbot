@@ -30,10 +30,10 @@ class Account(Base):
     __tablename__ = "accounts"
     id = Column(Integer, primary_key=True, index=True)
     country_id = Column(Integer, ForeignKey("countries.id"))
-    phone_number = Column(String, unique=True, index=True)
-    session_data = Column(String) # Can be session file path or string
+    phone_number = Column(String, index=True) # Removed unique=True to allow restocking same number
+    session_data = Column(Text, nullable=True) # Can be session file path or string
     is_sold = Column(Boolean, default=False)
-    type = Column(String, default="ID") # "ID" or "Session"
+    type = Column(String, default="ID") # ID or SESSION
     created_at = Column(DateTime, default=datetime.utcnow)
     twofa_password = Column(String, nullable=True)  # 2FA password (optional)
 
