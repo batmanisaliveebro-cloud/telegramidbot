@@ -112,6 +112,25 @@ def get_back_to_main():
 async def on_startup():
     logger.info("Bot started and polling...")
 
+
+# CRITICAL: Safe message edit wrapper to prevent "message not modified" crashes
+async def safe_edit_message(callback, text, reply_markup=None, parse_mode="HTML"):
+    """Safely edit a message, falling back to delete+send if edit fails"""
+    try:
+        await callback.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e:
+        # If edit fails (message not modified, message deleted, etc.)
+        try:
+            await callback.message.delete()
+        except:
+            pass
+        try:
+            await bot.send_message(callback.message.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+        except Exception as send_err:
+            logger.error(f"Could not send message after edit failed: {send_err}")
+            await callback.answer("✅ Action completed", show_alert=False)
+
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     logger.info(f"Received /start from {message.from_user.id}")
