@@ -1135,7 +1135,14 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
     # Check if login successful
     login_status = await session_mgr.check_login_status(phone_number)
     if login_status == "LOGGED_IN":
-        await message.edit_text(
+        # Use delete+send to avoid "message not modified" error
+        try:
+            await message.delete()
+        except:
+            pass
+        
+        await bot.send_message(
+            message.chat.id,
             f"🎉 <b>LOGIN DONE SUCCESSFULLY!</b>\n\n"
             f"🙏 <b>Thanks for Purchasing!</b>\n\n"
             f"📱 <b>Phone:</b> <code>{phone_number}</code>\n"
