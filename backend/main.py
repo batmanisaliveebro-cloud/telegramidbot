@@ -797,3 +797,47 @@ if os.path.exists(dist_path):
 uploads_path = os.path.join(os.path.dirname(__file__), "..", "uploads")
 os.makedirs(uploads_path, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
+" " "  
+ A d d   A c c o u n t   C r e a t i o n   E n d p o i n t  
+ T h i s   c r e a t e s   t h e   m i s s i n g   / a d m i n / a c c o u n t s   P O S T   e n d p o i n t  
+ " " "  
+  
+ #   A d d   t h i s   c o d e   t o   b a c k e n d / m a i n . p y  
+  
+ f r o m   p y d a n t i c   i m p o r t   B a s e M o d e l  
+  
+ c l a s s   A c c o u n t C r e a t e ( B a s e M o d e l ) :  
+         c o u n t r y _ i d :   i n t  
+         p h o n e _ n u m b e r :   s t r  
+         s e s s i o n _ d a t a :   s t r  
+         t y p e :   s t r   =   " I D "  
+         t w o f a _ p a s s w o r d :   s t r   =   N o n e  
+  
+ @ a p p . p o s t ( " / a d m i n / a c c o u n t s " )  
+ a s y n c   d e f   c r e a t e _ a c c o u n t ( a c c o u n t :   A c c o u n t C r e a t e ) :  
+         " " " C r e a t e   a   n e w   a c c o u n t   -   a l l o w s   d u p l i c a t e s   a f t e r   s o l d " " "  
+         a s y n c   w i t h   a s y n c _ s e s s i o n ( )   a s   s e s s i o n :  
+                 #   C r e a t e   n e w   a c c o u n t   ( n o   d u p l i c a t e   c h e c k   -   a l l o w s   r e s t o c k i n g )  
+                 n e w _ a c c o u n t   =   A c c o u n t (  
+                         c o u n t r y _ i d = a c c o u n t . c o u n t r y _ i d ,  
+                         p h o n e _ n u m b e r = a c c o u n t . p h o n e _ n u m b e r ,  
+                         s e s s i o n _ d a t a = a c c o u n t . s e s s i o n _ d a t a ,  
+                         t y p e = a c c o u n t . t y p e ,  
+                         t w o f a _ p a s s w o r d = a c c o u n t . t w o f a _ p a s s w o r d ,  
+                         i s _ s o l d = F a l s e  
+                 )  
+                  
+                 s e s s i o n . a d d ( n e w _ a c c o u n t )  
+                 a w a i t   s e s s i o n . c o m m i t ( )  
+                 a w a i t   s e s s i o n . r e f r e s h ( n e w _ a c c o u n t )  
+                  
+                 r e t u r n   {  
+                         " s u c c e s s " :   T r u e ,  
+                         " m e s s a g e " :   " A c c o u n t   a d d e d   s u c c e s s f u l l y " ,  
+                         " a c c o u n t " :   {  
+                                 " i d " :   n e w _ a c c o u n t . i d ,  
+                                 " p h o n e _ n u m b e r " :   n e w _ a c c o u n t . p h o n e _ n u m b e r ,  
+                                 " c o u n t r y _ i d " :   n e w _ a c c o u n t . c o u n t r y _ i d  
+                         }  
+                 }  
+ 
