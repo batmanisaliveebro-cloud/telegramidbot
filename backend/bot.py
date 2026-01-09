@@ -536,11 +536,11 @@ async def process_accounts(callback: types.CallbackQuery):
                 })
 
     if not countries_with_stock:
-        await callback.message.edit_text(
+        await safe_send(
+            callback,
             "❌ <b>No accounts available at the moment.</b>\n\n"
             "Please check back later or contact support.",
-            reply_markup=get_back_to_main(),
-            parse_mode="HTML"
+            reply_markup=get_back_to_main()
         )
         return
 
@@ -553,11 +553,11 @@ async def process_accounts(callback: types.CallbackQuery):
     
     builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
-    await callback.message.edit_text(
+    await safe_send(
+        callback,
         "🛍️ <b>Select a country to buy IDs:</b>\n\n"
         "Only showing countries with available stock.",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
+        reply_markup=builder.as_markup()
     )
 
 @dp.callback_query(F.data.startswith("country_"))
