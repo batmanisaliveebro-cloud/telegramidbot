@@ -77,6 +77,7 @@ async def health_check():
     return {"status": "ok", "mode": "webhook", "service": "Telegram Bot Backend"}
 
 @app.get("/health")
+@app.head("/health")  # Support HEAD requests for UptimeRobot
 async def detailed_health():
     """Detailed health check with database and webhook verification"""
     health_status = {"status": "healthy", "checks": {}}
