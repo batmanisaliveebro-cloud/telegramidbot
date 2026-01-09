@@ -6,6 +6,8 @@ const PaymentSettings = () => {
     const [upiId, setUpiId] = useState('');
     const [qrImage, setQrImage] = useState(null); // File object
     const [qrPreview, setQrPreview] = useState(''); // URL for preview
+    const [channelLink, setChannelLink] = useState('');
+    const [ownerUsername, setOwnerUsername] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
@@ -29,6 +31,8 @@ const PaymentSettings = () => {
             const response = await axios.get(`${API_BASE}/admin/settings/payment`);
             setUpiId(response.data.upi_id || '');
             setQrPreview(response.data.qr_image || '');
+            setChannelLink(response.data.channel_link || '');
+            setOwnerUsername(response.data.owner_username || '');
             setLoading(false);
         } catch (error) {
             console.error("Error fetching settings:", error);
@@ -57,6 +61,8 @@ const PaymentSettings = () => {
 
         const formData = new FormData();
         formData.append('upi_id', upiId);
+        formData.append('channel_link', channelLink);
+        formData.append('owner_username', ownerUsername);
         if (qrImage) {
             formData.append('qr_image', qrImage);
         }
@@ -144,14 +150,55 @@ const PaymentSettings = () => {
                         </div>
                     </div>
 
+                    {/* Bot Configuration Section */}
+                    <div className="border-t border-slate-700 pt-8 mt-8">
+                        <h3 className="text-xl font-bold text-white mb-6">📢 Bot Configuration</h3>
+
+                        <div className="space-y-6">
+                            {/* Channel Link */}
+                            <div>
+                                <label className="block text-slate-400 text-sm font-medium mb-2">
+                                    Channel Link
+                                </label>
+                                <input
+                                    type="url"
+                                    value={channelLink}
+                                    onChange={(e) => setChannelLink(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                                    placeholder="https://t.me/yourchannel"
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Telegram channel link for updates and announcements
+                                </p>
+                            </div>
+
+                            {/* Owner Username */}
+                            <div>
+                                <label className="block text-slate-400 text-sm font-medium mb-2">
+                                    Owner Username
+                                </label>
+                                <input
+                                    type="text"
+                                    value={ownerUsername}
+                                    onChange={(e) => setOwnerUsername(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                                    placeholder="@yourusername"
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Admin username for user support
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Submit Button */}
                     <div className="pt-4 border-t border-slate-700">
                         <button
                             type="submit"
                             disabled={saving}
                             className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${saving
-                                    ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-900/50'
+                                ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-900/50'
                                 }`}
                         >
                             {saving ? 'Saving...' : '💾 Save Payment Settings'}
@@ -161,8 +208,8 @@ const PaymentSettings = () => {
                     {/* Feedback Message */}
                     {message && (
                         <div className={`p-4 rounded-lg text-center font-medium ${message.includes('✅')
-                                ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                                : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
                             }`}>
                             {message}
                         </div>
