@@ -2809,9 +2809,9 @@ async def manage_devices_handler(callback: types.CallbackQuery):
             builder = InlineKeyboardBuilder()
         
         # Common buttons
-        builder.row(InlineKeyboardButton(text="ðŸ”„ Refresh Devices", callback_data=f"manage_devices_{account_id}"))
-        builder.row(InlineKeyboardButton(text="ðŸ”™ Back to Purchases", callback_data="btn_my_purchases"))
-        builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
+        builder.row(InlineKeyboardButton(text="🔄 Refresh Devices", callback_data=f"manage_devices_{account_id}"))
+        builder.row(InlineKeyboardButton(text="🔙 Back to Purchases", callback_data="btn_my_purchases"))
+        builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
         
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer()
