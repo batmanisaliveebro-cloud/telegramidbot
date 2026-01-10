@@ -2727,27 +2727,63 @@ async def manage_devices_handler(callback: types.CallbackQuery):
                 await callback.answer("âŒ Account not found!", show_alert=True)
                 return
         
-        # TODO: Implement Pyrogram to get active sessions
-        # For now, show mock data
-        text = f"ðŸ“± <b>Manage Devices</b>\n\n"
-        text += f"ðŸ“ž <b>Account:</b> <code>{account.phone_number}</code>\n\n"
-        text += "ðŸ”Œ <b>Active Devices:</b>\n\n"
+        # Get real active sessions using Pyrogram
+        try:
+            import os
+            from backend.pyrogram_devices import get_active_sessions
+            
+            # Get API credentials from environment
+            api_id = int(os.getenv("API_ID", "0"))
+            api_hash = os.getenv("API_HASH", "")
+            
+            if not account.session_data or api_id == 0 or not api_hash:
+                raise Exception("Missing session data or API credentials")
+            
+            # Fetch real devices
+            devices = await get_active_sessions(account.session_data, api_id, api_hash)
+            
+            text = f"📱 <b>Manage Devices</b>\n\n"
+            text += f"📞 <b>Account:</b> <code>{account.phone_number}</code>\n\n"
+            text += f"🔌 <b>Active Devices ({len(devices)}):</b>\n\n"
+            
+            builder = InlineKeyboardBuilder()
+            
+            if devices:
+                for device in devices:
+                    # Build device info
+                    device_text = f"{'🟢' if device['is_current'] else '⚪'} <b>{device['device_model']}</b>\n"
+                    device_text += f"   🕐 {device['last_seen']}\n"
+                    device_text += f"   📍 {device['location']}\n"
+                    device_text += f"   📱 {device['platform']}\n\n"
+                    text += device_text
+                    
+                    # Add terminate button (except for current device)
+                    if not device['is_current']:
+                        builder.row(InlineKeyboardButton(
+                            text=f"❌ Terminate {device['device_model'][:20]}",
+                            callback_data=f"terminate_device_{account_id}_{device['hash']}"
+                        ))
+                
+                # Add "Terminate All" button
+                builder.row(InlineKeyboardButton(
+                    text="🗑️ Terminate All Other Devices",
+                    callback_data=f"terminate_all_{account_id}"
+                ))
+            else:
+                text += "❌ No active devices found\n"
+            
+        except Exception as e:
+            logger.error(f"Error fetching real devices: {e}")
+            # Fallback to simple message
+            text = f"📱 <b>Manage Devices</b>\n\n"
+            text += f"📞 <b>Account:</b> <code>{account.phone_number}</code>\n\n"
+            text += f"⚠️ <b>Could not load devices</b>\n"
+            text += f"<i>Error: {str(e)}</i>\n\n"
+            text += "💡 Make sure API_ID and API_HASH are set in environment variables."
+            
+            builder = InlineKeyboardBuilder()
         
-        # Mock device list (replace with real Pyrogram data)
-        text += "1ï¸âƒ£ <b>Android Phone</b>\n"
-        text += "   ðŸ• Last seen: 2 minutes ago\n"
-        text += "   ðŸ“ Location: India\n\n"
-        
-        text += "2ï¸âƒ£ <b>Desktop (Windows)</b>\n"
-        text += "   ðŸ• Last seen: 1 hour ago\n"
-        text += "   ðŸ“ Location: India\n\n"
-        
-        text += "<i>âš ï¸ Tap a device to terminate it</i>"
-        
-        builder = InlineKeyboardBuilder()
-        # Add terminate buttons for each device
-        builder.row(InlineKeyboardButton(text="âŒ Terminate Android Phone", callback_data=f"terminate_device_{account_id}_1"))
-        builder.row(InlineKeyboardButton(text="âŒ Terminate Desktop", callback_data=f"terminate_device_{account_id}_2"))
+        # Common buttons
         builder.row(InlineKeyboardButton(text="ðŸ”„ Refresh Devices", callback_data=f"manage_devices_{account_id}"))
         builder.row(InlineKeyboardButton(text="ðŸ”™ Back to Purchases", callback_data="btn_my_purchases"))
         builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
@@ -2766,10 +2802,28 @@ async def terminate_device_handler(callback: types.CallbackQuery):
     try:
         parts = callback.data.split("_")
         account_id = int(parts[2])
-        device_id = parts[3]
+        session_hash = int(parts[3])
         
-        # TODO: Implement Pyrogram session termination
-        # For now, show confirmation
+        # Get account
+        async with async_session() as session:
+            account_stmt = select(Account).where(Account.id == account_id)
+            account_result = await session.execute(account_stmt)
+            account = account_result.scalar_one_or_none()
+            
+            if not account:
+                await callback.answer("❌ Account not found!", show_alert=True)
+                return
+        
+        # Terminate using Pyrogram
+        try:
+            from backend.pyrogram_devices import terminate_session
+            api_id = int(os.getenv("API_ID", "0"))
+            api_hash = os.getenv("API_HASH", "")
+            await terminate_session(account.session_data, api_id, api_hash, session_hash)
+        except Exception as e:
+            logger.error(f"Pyrogram error: {e}")
+            await callback.answer(f"❌ Failed: {str(e)[:50]}", show_alert=True)
+            return
         
         await callback.answer("âœ… Device terminated!", show_alert=True)
         
@@ -2786,3 +2840,47 @@ async def terminate_device_handler(callback: types.CallbackQuery):
     except Exception as e:
         logger.error(f"âŒ Terminate device error: {e}", exc_info=True)
         await callback.answer("âŒ Error terminating device!", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("terminate_all_"))
+async def terminate_all_handler(callback: types.CallbackQuery):
+    """Terminate all other devices except current"""
+    try:
+        account_id = int(callback.data.split("_")[2])
+        
+        # Get account
+        async with async_session() as session:
+            account_stmt = select(Account).where(Account.id == account_id)
+            account_result = await session.execute(account_stmt)
+            account = account_result.scalar_one_or_none()
+            
+            if not account:
+                await callback.answer("âŒ Account not found!", show_alert=True)
+                return
+        
+        # Terminate all using Pyrogram
+        try:
+            from backend.pyrogram_devices import terminate_all_except_current
+            api_id = int(os.getenv("API_ID", "0"))
+            api_hash = os.getenv("API_HASH", "")
+            await terminate_all_except_current(account.session_data, api_id, api_hash)
+            
+            await callback.answer("âœ… All devices terminated!", show_alert=True)
+            
+            text = "âœ… <b>All Other Devices Terminated</b>\n\n"
+            text += "All other devices have been logged out.\n\n"
+            text += "<i>Only the current device remains active.</i>"
+            
+            builder = InlineKeyboardBuilder()
+            builder.row(InlineKeyboardButton(text="ðŸ“± View Devices", callback_data=f"manage_devices_{account_id}"))
+            builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
+            
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+            
+        except Exception as e:
+            logger.error(f"Pyrogram error: {e}")
+            await callback.answer(f"âŒ Failed: {str(e)[:50]}", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"âŒ Terminate all error: {e}", exc_info=True)
+        await callback.answer("âŒ Error!", show_alert=True)

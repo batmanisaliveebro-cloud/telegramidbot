@@ -94,28 +94,28 @@ async def startup_event():
         logger.error("❌ BOT_TOKEN not set! Bot will not work!")
         return
     
-    # Retry logic - try up to 3 times to set webhook
-    max_retries = 3
-    retry_delay = 2  # seconds
+    # Retry logic - try up to 5 times to set webhook (increased from 3)
+    max_retries = 5
+    retry_delay = 3  # seconds (increased from 2)
     
     for attempt in range(1, max_retries + 1):
         try:
             async with aiohttp.ClientSession() as session:
                 # Step 1: Delete any existing webhook (clean slate)
                 delete_url = f"https://api.telegram.org/bot{bot_token}/deleteWebhook"
-                async with session.get(delete_url, params={"drop_pending_updates": True}) as response:
+                async with session.post(delete_url, json={"drop_pending_updates": True}) as response:
                     delete_result = await response.json()
                     logger.info(f"🗑️ Deleted old webhook (attempt {attempt}): {delete_result.get('ok', False)}")
                 
-                # Small delay to ensure Telegram processes the deletion
-                await asyncio.sleep(1)
+                # Longer delay to ensure Telegram processes the deletion
+                await asyncio.sleep(2)
                 
                 # Step 2: Set new webhook
                 set_url = f"https://api.telegram.org/bot{bot_token}/setWebhook"
                 webhook_data = {
                     "url": webhook_url,
                     "drop_pending_updates": True,  # Clear any stuck messages
-                    "max_connections": 40,
+                    "max_connections": 100,  # Increased from 40 for better performance
                     "allowed_updates": ["message", "callback_query"]  # Only what we need
                 }
                 
@@ -123,12 +123,13 @@ async def startup_event():
                     set_result = await response.json()
                     
                     if not set_result.get('ok'):
-                        logger.error(f"❌ Failed to set webhook: {set_result}")
+                        error_msg = set_result.get('description', 'Unknown error')
+                        logger.error(f"❌ Failed to set webhook (attempt {attempt}): {error_msg}")
                         if attempt < max_retries:
                             await asyncio.sleep(retry_delay)
                             continue
                         else:
-                            raise Exception(f"Webhook setup failed after {max_retries} attempts")
+                            raise Exception(f"Webhook setup failed after {max_retries} attempts: {error_msg}")
                     
                     logger.info(f"🔄 Setting webhook to: {webhook_url}")
                 
@@ -147,22 +148,26 @@ async def startup_event():
                         if actual_url != webhook_url:
                             logger.error(f"⚠️ URL MISMATCH! Expected: {webhook_url}, Got: {actual_url}")
                             if attempt < max_retries:
+                                logger.info(f"Retrying in {retry_delay} seconds...")
                                 await asyncio.sleep(retry_delay)
                                 continue
+                            else:
+                                raise Exception(f"Webhook URL mismatch after {max_retries} attempts")
                         
                         # Log success
                         logger.info(
-                            f"✅ Webhook Info: "
-                            f"URL={actual_url} | "
+                            f"✅ Webhook Active: "
+                            f"URL={actual_url[:50]}... | "
                             f"Pending={pending} | "
-                            f"Cert={webhook_info.get('has_custom_certificate', False)}"
+                            f"MaxConn=100 | "
+                            f"Attempt={attempt}/{max_retries}"
                         )
                         
                         if last_error:
                             logger.warning(f"⚠️ Last webhook error: {last_error}")
                         
                         # SUCCESS!
-                        logger.info(f"🎉 Bot is ready! Webhook configured successfully on attempt {attempt}")
+                        logger.info(f"🎉 BOT IS LIVE! Webhook connected successfully!")
                         return  # Exit function on success
                     
         except Exception as e:
