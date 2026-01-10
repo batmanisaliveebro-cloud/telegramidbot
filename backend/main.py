@@ -75,9 +75,14 @@ app = FastAPI(lifespan=lifespan)
 
 @app.on_event("startup")
 async def startup_event():
-    """Set up webhook when app starts"""
+    """
+    CRITICAL: Set up webhook when app starts
+    This ensures the bot ALWAYS responds, even after deployments
+    """
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Get webhook URL from environment or construct from Koyeb
+    # Get webhook URL from environment or use default Koyeb URL
     webhook_url = os.getenv(
         "WEBHOOK_URL",
         "https://doubtful-chelsae-decstorroyal-43b44335.koyeb.app/webhook"
@@ -85,46 +90,89 @@ async def startup_event():
     
     bot_token = os.getenv("BOT_TOKEN")
     
-    try:
-        async with aiohttp.ClientSession() as session:
-            # Delete any existing webhook
-            async with session.get(
-                f"https://api.telegram.org/bot{bot_token}/deleteWebhook"
-            ) as response:
-                logger.info(f"🗑️ Deleted old webhook: {await response.json()}")
-            
-            # Set new webhook
-            async with session.post(
-                f"https://api.telegram.org/bot{bot_token}/setWebhook",
-                json={
-                    "url": webhook_url,
-                    "drop_pending_updates": True,
-                    "max_connections": 40
-                }
-            ) as response:
-                result = await response.json()
-                logger.info(f"🔄 Setting webhook to: {webhook_url}")
-            
-            # Verify webhook
-            async with session.get(
-                f"https://api.telegram.org/bot{bot_token}/getWebhookInfo"
-            ) as response:
-                info = await response.json()
-                if info['ok']:
-                    webhook_info = info['result']
-                    logger.info(
-                        f"✅ Webhook Info: "
-                        f"URL={webhook_info.get('url')} | "
-                        f"Custom Cert={webhook_info.get('has_custom_certificate')} | "
-                        f"Pending={webhook_info.get('pending_update_count')}"
-                    )
-                    
-                    if webhook_info.get('last_error_message'):
-                        logger.error(f"⚠️ Webhook Error: {webhook_info['last_error_message']}")
+    if not bot_token:
+        logger.error("❌ BOT_TOKEN not set! Bot will not work!")
+        return
     
-    except Exception as e:
-        logger.error(f"❌ Failed to set webhook: {e}")
-        # Don't crash the app, just log the error
+    # Retry logic - try up to 3 times to set webhook
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Step 1: Delete any existing webhook (clean slate)
+                delete_url = f"https://api.telegram.org/bot{bot_token}/deleteWebhook"
+                async with session.get(delete_url, params={"drop_pending_updates": True}) as response:
+                    delete_result = await response.json()
+                    logger.info(f"🗑️ Deleted old webhook (attempt {attempt}): {delete_result.get('ok', False)}")
+                
+                # Small delay to ensure Telegram processes the deletion
+                await asyncio.sleep(1)
+                
+                # Step 2: Set new webhook
+                set_url = f"https://api.telegram.org/bot{bot_token}/setWebhook"
+                webhook_data = {
+                    "url": webhook_url,
+                    "drop_pending_updates": True,  # Clear any stuck messages
+                    "max_connections": 40,
+                    "allowed_updates": ["message", "callback_query"]  # Only what we need
+                }
+                
+                async with session.post(set_url, json=webhook_data) as response:
+                    set_result = await response.json()
+                    
+                    if not set_result.get('ok'):
+                        logger.error(f"❌ Failed to set webhook: {set_result}")
+                        if attempt < max_retries:
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        else:
+                            raise Exception(f"Webhook setup failed after {max_retries} attempts")
+                    
+                    logger.info(f"🔄 Setting webhook to: {webhook_url}")
+                
+                # Step 3: Verify webhook is actually set
+                info_url = f"https://api.telegram.org/bot{bot_token}/getWebhookInfo"
+                async with session.get(info_url) as response:
+                    info = await response.json()
+                    
+                    if info['ok']:
+                        webhook_info = info['result']
+                        actual_url = webhook_info.get('url', '')
+                        pending = webhook_info.get('pending_update_count', 0)
+                        last_error = webhook_info.get('last_error_message')
+                        
+                        # Verify URL matches
+                        if actual_url != webhook_url:
+                            logger.error(f"⚠️ URL MISMATCH! Expected: {webhook_url}, Got: {actual_url}")
+                            if attempt < max_retries:
+                                await asyncio.sleep(retry_delay)
+                                continue
+                        
+                        # Log success
+                        logger.info(
+                            f"✅ Webhook Info: "
+                            f"URL={actual_url} | "
+                            f"Pending={pending} | "
+                            f"Cert={webhook_info.get('has_custom_certificate', False)}"
+                        )
+                        
+                        if last_error:
+                            logger.warning(f"⚠️ Last webhook error: {last_error}")
+                        
+                        # SUCCESS!
+                        logger.info(f"🎉 Bot is ready! Webhook configured successfully on attempt {attempt}")
+                        return  # Exit function on success
+                    
+        except Exception as e:
+            logger.error(f"❌ Webhook setup attempt {attempt} failed: {e}")
+            if attempt < max_retries:
+                await asyncio.sleep(retry_delay)
+            else:
+                logger.error(f"🚨 CRITICAL: Webhook setup failed after {max_retries} attempts!")
+                logger.error("Bot will NOT receive messages until webhook is manually fixed!")
+
 
 @app.get("/")
 async def health_check():
