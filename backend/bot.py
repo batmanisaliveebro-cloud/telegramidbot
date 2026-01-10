@@ -2686,6 +2686,26 @@ async def retry_code_handler(callback: types.CallbackQuery):
         except:
             otp_code = "Check Telegram app"
         
+        # Build message with emoji
+        text = f"🔄 <b>Retry Login Code</b>\n\n"
+        text += f"📱 <b>Phone:</b> <code>{account.phone_number}</code>\n"
+        if account.twofa_password:
+            text += f"🔐 <b>2FA:</b> <code>{account.twofa_password}</code>\n"
+        
+        # Add emoji to OTP code
+        if otp_code and otp_code not in ["Check Telegram app", "No code found", "Session not available"]:
+            display_code = f"🔢 {otp_code}"
+        else:
+            display_code = otp_code
+            
+        text += f"\n📨 <b>Login Code:</b> <code>{display_code}</code>\n\n"
+        text += "💡 <i>A new login code has been requested. Check your Telegram app!</i>"
+        
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(text="🔄 Retry Again", callback_data=f"retry_code_{account_id}"))
+        builder.row(InlineKeyboardButton(text="📱 Manage Devices", callback_data=f"manage_devices_{account_id}"))
+        builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
+
         
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer("ðŸ“¨ New code requested!")
