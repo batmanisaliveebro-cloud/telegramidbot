@@ -1,7 +1,6 @@
-﻿import os
+import os
 import logging
 import asyncio
-from datetime import datetime
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -13,7 +12,6 @@ from .database import async_session
 from .models import User, Country, Account, Purchase, Deposit, Settings
 from .session_manager import get_session_manager
 from .device_manager import DeviceManager
-from .session_handlers import register_session_handlers
 from sqlalchemy import select, update
 
 load_dotenv()
@@ -30,19 +28,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Register device session management handlers
-register_session_handlers(dp)
-
 # --- Global Error Handler for Maximum Stability ---
 @dp.errors()
-async def error_handler(event: types.ErrorEvent):
+async def error_handler(update: types.Update, exception: Exception):
     """
     Global error handler to prevent bot crashes.
     Catches all uncaught exceptions and logs them instead of crashing.
     """
-    update = event.update
-    exception = event.exception
-    logger.error(f"Γ¥î Error handling update {update.update_id if update else 'Unknown'}: {exception}", exc_info=True)
+    logger.error(f"❌ Uncaught error in {event.__class__.__name__}: {exception}", exc_info=True)
     
     # Try to notify user of error if it's a callback or message update
     try:
@@ -60,7 +53,7 @@ async def error_handler(event: types.ErrorEvent):
                 try:
                     await bot.send_message(
                         chat_id,
-                        "ΓÜá∩╕Å An error occurred. Please try again or contact support if the issue persists.",
+                        "⚠️ An error occurred. Please try again or contact support if the issue persists.",
                         reply_markup=get_back_to_main()
                     )
                 except:
@@ -70,24 +63,6 @@ async def error_handler(event: types.ErrorEvent):
     
     # Return True to mark error as handled and prevent bot crash
     return True
-
-# --- Safe Message Sender ---
-async def safe_send(callback: types.CallbackQuery, text: str, reply_markup=None, parse_mode="HTML"):
-    """
-    Universal safe message sender - always deletes old message and sends new one.
-    This prevents ALL "message not modified" errors.
-    """
-    try:
-        await callback.message.delete()
-    except Exception as e:
-        logger.debug(f"Could not delete message: {e}")
-    
-    try:
-        return await callback.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
-    except Exception as e:
-        logger.error(f"Error sending message: {e}")
-        await callback.answer("Γ¥î Error sending message. Please try again.")
-        return None
 
 # --- FSM States ---
 class DepositStates(StatesGroup):
@@ -104,31 +79,31 @@ def get_main_menu(is_admin=False):
     
     # Row 1: Get Account | Profile
     builder.row(
-        InlineKeyboardButton(text="≡ƒƒó Get Account", callback_data="btn_accounts"),
-        InlineKeyboardButton(text="≡ƒæñ Profile", callback_data="btn_profile")
+        InlineKeyboardButton(text="🟢 Get Account", callback_data="btn_accounts"),
+        InlineKeyboardButton(text="👤 Profile", callback_data="btn_profile")
     )
     
     # Row 2: Deposit | Support
     builder.row(
-        InlineKeyboardButton(text="≡ƒÆ░ Deposit", callback_data="btn_deposit"),
-        InlineKeyboardButton(text="≡ƒåÿ Support", callback_data="btn_help")
+        InlineKeyboardButton(text="💰 Deposit", callback_data="btn_deposit"),
+        InlineKeyboardButton(text="🆘 Support", callback_data="btn_help")
     )
     
     # Row 4: Main Menu
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
     if is_admin:
         admin_url = os.getenv("ADMIN_WEBAPP_URL", "https://telegram-bot-full.vercel.app")
         builder.row(
-            InlineKeyboardButton(text="ΓÜÖ∩╕Å Admin Web App", web_app=WebAppInfo(url=admin_url)),
-            InlineKeyboardButton(text="≡ƒÆ│ Payment Settings", web_app=WebAppInfo(url=admin_url + "/settings"))
+            InlineKeyboardButton(text="⚙️ Admin Web App", web_app=WebAppInfo(url=admin_url)),
+            InlineKeyboardButton(text="💳 Payment Settings", web_app=WebAppInfo(url=admin_url + "/settings"))
         )
     
     return builder.as_markup()
 
 def get_back_to_main():
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     return builder.as_markup()
 
 # --- Handlers ---
@@ -153,7 +128,7 @@ async def safe_edit_message(callback, text, reply_markup=None, parse_mode="HTML"
             await bot.send_message(callback.message.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode)
         except Exception as send_err:
             logger.error(f"Could not send message after edit failed: {send_err}")
-            await callback.answer("Γ£à Action completed", show_alert=False)
+            await callback.answer("✅ Action completed", show_alert=False)
 
 
 @dp.message(Command("start"))
@@ -193,21 +168,21 @@ async def cmd_start(message: types.Message):
         logger.error(f"Error in /start handler: {e}")
         # DEBUG: Tell the user what happened so we can diagnose "no reply" issues
         if should_be_admin: # Only show details to admin if possible, or just show everyone for now
-             await message.answer(f"ΓÜá∩╕Å <b>System Error during Login:</b>\n<code>{str(e)}</code>", parse_mode="HTML")
+             await message.answer(f"⚠️ <b>System Error during Login:</b>\n<code>{str(e)}</code>", parse_mode="HTML")
         # Even if DB fails, we want to try show the menu if possible, or maybe stop here?
     
     # Ensure is_admin has a value even if DB failed (False)
     # If DB failed, this might fail too if get_main_menu relies on DB? No it doesn't.
     try:
         await message.answer(
-            f"<b>≡ƒæï Hello {message.from_user.full_name}, Welcome to our Premium Store!</b>\n\n"
-        "ΓÜí <b>Instant Delivery | High Quality | 24/7 Support</b>\n"
-        "ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü\n\n"
-        "≡ƒ¢Æ <b>Best Place to Buy:</b>\n"
-        "ΓÇó Telegram Accounts (TData/Session)\n"
-        "ΓÇó Fresh & Aged IDs\n"
-        "ΓÇó Bulk Orders Available\n\n"
-        "≡ƒæç <b>Choose an option below to start:</b>",
+            f"<b>👋 Hello {message.from_user.full_name}, Welcome to our Premium Store!</b>\n\n"
+        "⚡ <b>Instant Delivery | High Quality | 24/7 Support</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🛒 <b>Best Place to Buy:</b>\n"
+        "• Telegram Accounts (TData/Session)\n"
+        "• Fresh & Aged IDs\n"
+        "• Bulk Orders Available\n\n"
+        "👇 <b>Choose an option below to start:</b>",
         reply_markup=get_main_menu(is_admin=is_admin),
         parse_mode="HTML"
     )
@@ -222,13 +197,13 @@ async def cmd_start(message: types.Message):
 @dp.callback_query(F.data == "btn_deposit")
 async def process_deposit_start(callback: types.CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="≡ƒç«≡ƒç│ UPI (Manual)", callback_data="btn_deposit_upi_manual"))
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="🇮🇳 UPI (Manual)", callback_data="btn_deposit_upi_manual"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
     await callback.message.edit_text(
-        "<b>≡ƒÆ╕ Deposit Funds</b>\n\n"
+        "<b>💸 Deposit Funds</b>\n\n"
         "Choose your deposit method:\n\n"
-        "ΓÇó <b>UPI (Manual)</b> ΓÇö Admin verifies your UTR before credit",
+        "• <b>UPI (Manual)</b> — Admin verifies your UTR before credit",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
@@ -237,8 +212,8 @@ async def process_deposit_start(callback: types.CallbackQuery, state: FSMContext
 async def process_deposit_method_upi(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(DepositStates.waiting_for_amount)
     await callback.message.edit_text(
-        "<b>≡ƒÆÄ Deposit Balance</b>\n\n"
-        "Please enter the amount in <b>Γé╣ (INR)</b> you wish to deposit:",
+        "<b>💎 Deposit Balance</b>\n\n"
+        "Please enter the amount in <b>₹ (INR)</b> you wish to deposit:",
         reply_markup=get_back_to_main(),
         parse_mode="HTML"
     )
@@ -246,7 +221,7 @@ async def process_deposit_method_upi(callback: types.CallbackQuery, state: FSMCo
 @dp.message(DepositStates.waiting_for_amount)
 async def process_deposit_amount(message: types.Message, state: FSMContext):
     if not message.text or not message.text.isdigit():
-        await message.answer("Γ¥î <b>Invalid Amount!</b> Please enter a numeric value:")
+        await message.answer("❌ <b>Invalid Amount!</b> Please enter a numeric value:")
         return
     
     amount = float(message.text)
@@ -267,7 +242,7 @@ async def process_deposit_amount(message: types.Message, state: FSMContext):
         custom_qr_path = qr_image.value if qr_image else None
         
         builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+        builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
         
         if custom_qr_path:
             # Check if it's a URL (Supabase) or Local File
@@ -280,14 +255,14 @@ async def process_deposit_amount(message: types.Message, state: FSMContext):
             if photo_input:
                 # Send Custom QR
                 text = (
-                    f"<b>≡ƒÅº Deposit Amount: Γé╣{amount}</b>\n\n"
-                    f"≡ƒôì <b>UPI ID:</b> <code>{target_upi_id}</code>\n\n"
-                    "≡ƒô╕ <b>Scan the QR Code below to Pay</b>\n\n"
-                    "Γ£à <b>Instructions:</b>\n"
+                    f"<b>🏧 Deposit Amount: ₹{amount}</b>\n\n"
+                    f"📍 <b>UPI ID:</b> <code>{target_upi_id}</code>\n\n"
+                    "📸 <b>Scan the QR Code below to Pay</b>\n\n"
+                    "✅ <b>Instructions:</b>\n"
                     "1. Open your UPI app.\n"
                     "2. Scan this QR or pay to the UPI ID.\n"
                     "3. Copy the <b>UTR / Transaction Ref ID</b>.\n\n"
-                    "≡ƒæë <b>Please enter the UTR / Ref ID here after payment:</b>"
+                    "👉 <b>Please enter the UTR / Ref ID here after payment:</b>"
                 )
                 await message.answer_photo(
                     photo_input,
@@ -307,14 +282,14 @@ async def process_deposit_amount(message: types.Message, state: FSMContext):
             qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={qr_data}"
 
             text = (
-                f"<b>≡ƒÅº Deposit Amount: Γé╣{amount}</b>\n\n"
-                f"≡ƒôì <b>UPI ID:</b> <code>{target_upi_id}</code>\n\n"
-                "≡ƒô╕ <b>Scan QR or use the UPI ID above</b>\n\n"
-                "Γ£à <b>Instructions:</b>\n"
+                f"<b>🏧 Deposit Amount: ₹{amount}</b>\n\n"
+                f"📍 <b>UPI ID:</b> <code>{target_upi_id}</code>\n\n"
+                "📸 <b>Scan QR or use the UPI ID above</b>\n\n"
+                "✅ <b>Instructions:</b>\n"
                 "1. Open your UPI app (PhonePe, GPay, Paytm, etc.)\n"
                 "2. Pay the above amount.\n"
                 "3. Copy the <b>UTR / Transaction Ref ID</b>.\n\n"
-                "≡ƒæë <b>Please enter the UTR / Ref ID here after payment:</b>"
+                "👉 <b>Please enter the UTR / Ref ID here after payment:</b>"
             )
             
             await message.answer_photo(
@@ -328,7 +303,7 @@ async def process_deposit_amount(message: types.Message, state: FSMContext):
 async def process_deposit_utr(message: types.Message, state: FSMContext):
     utr_id = message.text
     if not utr_id or len(utr_id) < 6:
-        await message.answer("Γ¥î <b>Invalid UTR!</b>\n\nPlease enter a valid Transaction Ref ID:", reply_markup=get_back_to_main(), parse_mode="HTML")
+        await message.answer("❌ <b>Invalid UTR!</b>\n\nPlease enter a valid Transaction Ref ID:", reply_markup=get_back_to_main(), parse_mode="HTML")
         return
     
     # Check for duplicate UTR
@@ -339,7 +314,7 @@ async def process_deposit_utr(message: types.Message, state: FSMContext):
         
         if existing:
             await message.answer(
-                "ΓÜá∩╕Å <b>Duplicate UTR Detected!</b>\n\n"
+                "⚠️ <b>Duplicate UTR Detected!</b>\n\n"
                 "This Transaction Ref ID has already been submitted. Please do not submit double UTRs. "
                 "If you believe this is an error, please contact support.",
                 reply_markup=get_back_to_main(),
@@ -351,12 +326,12 @@ async def process_deposit_utr(message: types.Message, state: FSMContext):
     await state.set_state(DepositStates.confirming_utr)
     
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="Γ£à Confirm UTR", callback_data="confirm_utr"))
-    builder.row(InlineKeyboardButton(text="Γ¥î Edit UTR", callback_data="btn_deposit_reenter_amount")) # Simplified backtrack
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="✅ Confirm UTR", callback_data="confirm_utr"))
+    builder.row(InlineKeyboardButton(text="❌ Edit UTR", callback_data="btn_deposit_reenter_amount")) # Simplified backtrack
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
 
     await message.answer(
-        f"≡ƒöÄ <b>Review your UTR:</b>\n\n"
+        f"🔎 <b>Review your UTR:</b>\n\n"
         f"<code>{utr_id}</code>\n\n"
         "Is this correct? Click confirm to proceed to the final step.",
         reply_markup=builder.as_markup(),
@@ -367,8 +342,8 @@ async def process_deposit_utr(message: types.Message, state: FSMContext):
 async def process_utr_confirmed(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(DepositStates.waiting_for_screenshot)
     await callback.message.edit_text(
-        "Γ£à <b>UTR Confirmed!</b>\n\n"
-        "≡ƒô╕ <b>Final Step:</b> Please upload the <b>Payment Screenshot</b> for verification:",
+        "✅ <b>UTR Confirmed!</b>\n\n"
+        "📸 <b>Final Step:</b> Please upload the <b>Payment Screenshot</b> for verification:",
         reply_markup=get_back_to_main(),
         parse_mode="HTML"
     )
@@ -377,7 +352,7 @@ async def process_utr_confirmed(callback: types.CallbackQuery, state: FSMContext
 async def process_reenter_utr(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(DepositStates.waiting_for_utr)
     await callback.message.edit_text(
-        "≡ƒô¥ <b>Re-enter UTR:</b>\n\nPlease send the correct Transaction Ref ID now:",
+        "📝 <b>Re-enter UTR:</b>\n\nPlease send the correct Transaction Ref ID now:",
         reply_markup=get_back_to_main(),
         parse_mode="HTML"
     )
@@ -390,12 +365,12 @@ async def process_deposit_screenshot(message: types.Message, state: FSMContext):
     await state.set_state(DepositStates.confirming_screenshot)
     
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="Γ£à Confirm & Submit", callback_data="confirm_deposit"))
-    builder.row(InlineKeyboardButton(text="Γ¥î Re-upload Photo", callback_data="reupload_screenshot"))
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="✅ Confirm & Submit", callback_data="confirm_deposit"))
+    builder.row(InlineKeyboardButton(text="❌ Re-upload Photo", callback_data="reupload_screenshot"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
 
     await message.answer(
-        "≡ƒöÄ <b>Is this the correct payment screenshot?</b>\n\n"
+        "🔎 <b>Is this the correct payment screenshot?</b>\n\n"
         "Click the button below to submit your deposit for admin approval.",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
@@ -405,7 +380,7 @@ async def process_deposit_screenshot(message: types.Message, state: FSMContext):
 async def process_reupload_screenshot(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(DepositStates.waiting_for_screenshot)
     await callback.message.edit_text(
-        "≡ƒô╕ <b>Please upload the screenshot again:</b>",
+        "📸 <b>Please upload the screenshot again:</b>",
         reply_markup=get_back_to_main(),
         parse_mode="HTML"
     )
@@ -476,10 +451,10 @@ async def process_deposit_final_confirm(callback: types.CallbackQuery, state: FS
                 
                 # Notify User
                 await callback.message.edit_text(
-                    "Γ£à <b>Deposit Submitted!</b>\n\n"
-                    f"≡ƒÆ░ Amount: Γé╣{amount}\n"
-                    f"≡ƒåö UTR: <code>{utr_id}</code>\n\n"
-                    "ΓÅ│ Your deposit is pending verification. Please wait for admin approval.",
+                    "✅ <b>Deposit Submitted!</b>\n\n"
+                    f"💰 Amount: ₹{amount}\n"
+                    f"🆔 UTR: <code>{utr_id}</code>\n\n"
+                    "⏳ Your deposit is pending verification. Please wait for admin approval.",
                     reply_markup=get_back_to_main(),
                     parse_mode="HTML"
                 )
@@ -492,29 +467,29 @@ async def process_deposit_final_confirm(callback: types.CallbackQuery, state: FS
                             chat_id=admin_id,
                             photo=photo_id,
                             caption=(
-                                f"≡ƒöö <b>New Deposit Alert!</b>\n\n"
-                                f"≡ƒæñ User: {callback.from_user.full_name} (@{callback.from_user.username})\n"
-                                f"≡ƒÆ░ Amount: Γé╣{amount}\n"
-                                f"≡ƒåö UTR: {utr_id}\n"
-                                f"≡ƒû╝ URL: {public_url}"
+                                f"🔔 <b>New Deposit Alert!</b>\n\n"
+                                f"👤 User: {callback.from_user.full_name} (@{callback.from_user.username})\n"
+                                f"💰 Amount: ₹{amount}\n"
+                                f"🆔 UTR: {utr_id}\n"
+                                f"🖼 URL: {public_url}"
                             ),
                             parse_mode="HTML"
                         )
                     except Exception as e:
                         logger.error(f"Failed to notify admin: {e}")
             else:
-                 await callback.message.edit_text("Γ¥î User not found in database.")
+                 await callback.message.edit_text("❌ User not found in database.")
                  
     except Exception as e:
         logger.error(f"Failed to upload to Supabase: {e}")
-        await callback.message.answer(f"Γ¥î Error uploading screenshot: {e}")
+        await callback.message.answer(f"❌ Error uploading screenshot: {e}")
 
     await state.clear()
 
 @dp.message(DepositStates.waiting_for_screenshot)
 async def process_deposit_screenshot_invalid(message: types.Message):
     await message.answer(
-        "ΓÜá∩╕Å <b>Not a picture or anything! Only images are allowed.</b>\n\n"
+        "⚠️ <b>Not a picture or anything! Only images are allowed.</b>\n\n"
         "Please upload the payment screenshot to proceed:",
         reply_markup=get_back_to_main(),
         parse_mode="HTML"
@@ -525,30 +500,23 @@ async def process_deposit_screenshot_invalid(message: types.Message):
 @dp.callback_query(F.data == "btn_accounts")
 async def process_accounts(callback: types.CallbackQuery):
     async with async_session() as session:
-        # Get all countries with stock counts in ONE query (performance optimization)
-        from sqlalchemy import func
-        
-        # Single efficient query with GROUP BY
-        stock_query = select(
-            Account.country_id,
-            func.count(Account.id).label('stock_count')
-        ).where(
-            Account.is_sold == False,
-            Account.type == "ID"
-        ).group_by(Account.country_id)
-        
-        stock_result = await session.execute(stock_query)
-        stock_by_country = {row.country_id: row.stock_count for row in stock_result}
-        
         # Get all countries
         stmt = select(Country)
         result = await session.execute(stmt)
         countries = result.scalars().all()
         
-        # Build list of countries with stock
+        # Calculate stock for each country (only IDs)
         countries_with_stock = []
         for country in countries:
-            stock_count = stock_by_country.get(country.id, 0)
+            stock_stmt = select(Account).where(
+                Account.country_id == country.id,
+                Account.is_sold == False,
+                Account.type == "ID"
+            )
+            stock_res = await session.execute(stock_stmt)
+            stock_count = len(stock_res.scalars().all())
+            
+            # Only include countries with available stock
             if stock_count > 0:
                 countries_with_stock.append({
                     'country': country,
@@ -556,11 +524,11 @@ async def process_accounts(callback: types.CallbackQuery):
                 })
 
     if not countries_with_stock:
-        await safe_send(
-            callback,
-            "Γ¥î <b>No accounts available at the moment.</b>\n\n"
+        await callback.message.edit_text(
+            "❌ <b>No accounts available at the moment.</b>\n\n"
             "Please check back later or contact support.",
-            reply_markup=get_back_to_main()
+            reply_markup=get_back_to_main(),
+            parse_mode="HTML"
         )
         return
 
@@ -568,16 +536,16 @@ async def process_accounts(callback: types.CallbackQuery):
     for item in countries_with_stock:
         country = item['country']
         stock = item['stock']
-        button_text = f"{country.emoji} {country.name} | ≡ƒôª {stock} IDs"
+        button_text = f"{country.emoji} {country.name} | 📦 {stock} IDs"
         builder.row(InlineKeyboardButton(text=button_text, callback_data=f"country_{country.id}"))
     
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
-    await safe_send(
-        callback,
-        "≡ƒ¢ì∩╕Å <b>Select a country to buy IDs:</b>\n\n"
+    await callback.message.edit_text(
+        "🛍️ <b>Select a country to buy IDs:</b>\n\n"
         "Only showing countries with available stock.",
-        reply_markup=builder.as_markup()
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
     )
 
 @dp.callback_query(F.data.startswith("country_"))
@@ -603,65 +571,52 @@ async def process_country_selection(callback: types.CallbackQuery):
         available_stock = len(available_accounts)
 
         if available_stock == 0:
-            text = f"≡ƒÅ┤ <b>Country:</b> {country.emoji} {country.name}\n"
-            text += f"≡ƒÆ╡ <b>Price per ID:</b> Γé╣{country.price}\n"
-            text += f"≡ƒôª <b>Available Stock:</b> {available_stock} IDs\n\n"
-            text += "Γ¥î Out of stock. Please check back later."
+            text = f"🏴 <b>Country:</b> {country.emoji} {country.name}\n"
+            text += f"💵 <b>Price per ID:</b> ₹{country.price}\n"
+            text += f"📦 <b>Available Stock:</b> {available_stock} IDs\n\n"
+            text += "❌ Out of stock. Please check back later."
             
             builder = InlineKeyboardBuilder()
-            builder.row(InlineKeyboardButton(text="≡ƒöÖ Back", callback_data="btn_accounts"))
-            builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+            builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="btn_accounts"))
+            builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
             
-            try:
-                await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-            except Exception as e:
-                logger.error(f"Error editing message for no stock: {e}")
-                await callback.answer("Γ¥î Out of stock")
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
             return
 
         # Get first available account to show phone number
         preview_account = available_accounts[0]
         
         # Show confirmation with phone number and disclaimer
-        text = f"≡ƒÅ┤ <b>Country:</b> {country.emoji} {country.name}\n"
-        text += f"≡ƒÆ╡ <b>Price:</b> Γé╣{country.price}\n"
-        text += f"≡ƒô▒ <b>Phone Number:</b> <code>{preview_account.phone_number}</code>\n"
-        text += f"≡ƒôª <b>Stock:</b> {available_stock} available\n\n"
-        text += "ΓÜá∩╕Å <b>IMPORTANT DISCLAIMER:</b>\n"
-        text += "ΓÇó We are NOT responsible for banned/frozen accounts\n"
-        text += "ΓÇó No refunds for account restrictions\n"
-        text += "ΓÇó Use at your own risk\n"
-        text += "ΓÇó Follow Telegram's Terms of Service\n\n"
-        text += "≡ƒÆí <b>You will receive:</b>\n"
-        text += "ΓÇó Phone number\n"
-        text += "ΓÇó OTP codes automatically\n"
-        text += "ΓÇó Login assistance\n\n"
-        text += "Γ£à <b>Confirm purchase?</b>"
+        text = f"🏴 <b>Country:</b> {country.emoji} {country.name}\n"
+        text += f"💵 <b>Price:</b> ₹{country.price}\n"
+        text += f"📱 <b>Phone Number:</b> <code>{preview_account.phone_number}</code>\n"
+        text += f"📦 <b>Stock:</b> {available_stock} available\n\n"
+        text += "⚠️ <b>IMPORTANT DISCLAIMER:</b>\n"
+        text += "• We are NOT responsible for banned/frozen accounts\n"
+        text += "• No refunds for account restrictions\n"
+        text += "• Use at your own risk\n"
+        text += "• Follow Telegram's Terms of Service\n\n"
+        text += "💡 <b>You will receive:</b>\n"
+        text += "• Phone number\n"
+        text += "• OTP codes automatically\n"
+        text += "• Login assistance\n\n"
+        text += "✅ <b>Confirm purchase?</b>"
         
         builder = InlineKeyboardBuilder()
         builder.row(InlineKeyboardButton(
-            text="Γ£à Confirm Purchase",
+            text="✅ Confirm Purchase",
             callback_data=f"confirm_buy_{country_id}"
         ))
         builder.row(InlineKeyboardButton(
-            text="Γ¥î Cancel",
+            text="❌ Cancel",
             callback_data="btn_accounts"
         ))
         builder.row(InlineKeyboardButton(
-            text="≡ƒÅá Main Menu",
+            text="🏠 Main Menu",
             callback_data="btn_main_menu"
         ))
         
-        try:
-            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"Error editing message for country purchase confirmation: {e}")
-            # If edit fails, delete and send new message
-            try:
-                await callback.message.delete()
-            except:
-                pass
-            await callback.message.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 @dp.callback_query(F.data == "btn_profile")
 async def process_profile(callback: types.CallbackQuery):
@@ -695,19 +650,19 @@ async def process_profile(callback: types.CallbackQuery):
         rankings.sort(key=lambda x: x[1], reverse=True)
         user_rank = next((i + 1 for i, r in enumerate(rankings) if r[0] == user.id), "N/A")
 
-        text = "≡ƒæñ <b>Your Profile</b>\n\n"
+        text = "👤 <b>Your Profile</b>\n\n"
         text += f"ID: <code>{user.telegram_id}</code>\n"
         text += f"Name: {user.full_name}\n"
         text += f"Username: @{user.username if user.username else 'N/A'}\n"
-        text += f"≡ƒÆ░ Balance: <b>Γé╣{user.balance}</b>\n"
-        text += f"≡ƒÆ╕ Total Spent: <b>Γé╣{total_spent}</b>\n"
-        text += f"≡ƒÅå Rank: <b>#{user_rank}</b> in total buyers\n\n"
+        text += f"💰 Balance: <b>₹{user.balance}</b>\n"
+        text += f"💸 Total Spent: <b>₹{total_spent}</b>\n"
+        text += f"🏆 Rank: <b>#{user_rank}</b> in total buyers\n\n"
         
         builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(text="≡ƒô£ Transaction Deposits", callback_data="btn_transactions"))
-        builder.row(InlineKeyboardButton(text="≡ƒ¢Æ ID Buyed", callback_data="btn_purchases"))
-        builder.row(InlineKeyboardButton(text="Γ₧ò Add Balance", callback_data="btn_deposit"))
-        builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+        builder.row(InlineKeyboardButton(text="📜 Transaction Deposits", callback_data="btn_transactions"))
+        builder.row(InlineKeyboardButton(text="🛒 ID Buyed", callback_data="btn_purchases"))
+        builder.row(InlineKeyboardButton(text="➕ Add Balance", callback_data="btn_deposit"))
+        builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
         
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
@@ -724,17 +679,17 @@ async def process_transactions_history(callback: types.CallbackQuery):
         dep_res = await session.execute(dep_stmt)
         deposits = dep_res.scalars().all()
         
-    text = "≡ƒô£ <b>Recent Deposits</b>\n\n"
+    text = "📜 <b>Recent Deposits</b>\n\n"
     if not deposits:
         text += "<i>No deposits found.</i>"
     else:
         for d in deposits:
-            status_emo = "ΓÅ│" if d.status == "PENDING" else "Γ£à" if d.status == "APPROVED" else "Γ¥î"
-            text += f"{status_emo} Γé╣{d.amount} | {d.created_at.strftime('%Y-%m-%d')}\n"
+            status_emo = "⏳" if d.status == "PENDING" else "✅" if d.status == "APPROVED" else "❌"
+            text += f"{status_emo} ₹{d.amount} | {d.created_at.strftime('%Y-%m-%d')}\n"
             text += f"Ref: <code>{d.upi_ref_id}</code>\n\n"
             
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="≡ƒöÖ Back to Profile", callback_data="btn_profile"))
+    builder.row(InlineKeyboardButton(text="🔙 Back to Profile", callback_data="btn_profile"))
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 @dp.callback_query(F.data == "btn_purchases")
@@ -751,36 +706,36 @@ async def process_purchase_history(callback: types.CallbackQuery):
         purchases = pur_res.scalars().all()
         
     # Show purchase history as clickable buttons
-    text = "≡ƒ¢Æ <b>Purchase History</b>\nSelect an account to manage sessions:\n\n"
+    text = "🛒 <b>Purchase History</b>\nSelect an account to manage sessions:\n\n"
     builder = InlineKeyboardBuilder()
     
     if not purchases:
-        text = "≡ƒ¢Æ <b>Purchase History</b>\n\n<i>No purchases found.</i>"
+        text = "🛒 <b>Purchase History</b>\n\n<i>No purchases found.</i>"
     else:
         for p in purchases:
             # Use purchase ID for management
-            label = f"≡ƒô▒ Account #{p.id} | Γé╣{p.amount}"
+            label = f"📱 Account #{p.id} | ₹{p.amount}"
             builder.row(InlineKeyboardButton(
                 text=f"{label} | {p.created_at.strftime('%Y-%m-%d')}",
                 callback_data=f"manage_sess_{p.id}"
             ))
         
-    builder.row(InlineKeyboardButton(text="≡ƒöÖ Back to Profile", callback_data="btn_profile"))
+    builder.row(InlineKeyboardButton(text="🔙 Back to Profile", callback_data="btn_profile"))
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
 @dp.callback_query(F.data == "btn_help")
 async def process_help(callback: types.CallbackQuery):
     text = (
-        "<b>Γ¥ô Need Help?</b>\n\n"
-        "ΓÜí <b>We have the fastest customer support!</b>\n\n"
+        "<b>❓ Need Help?</b>\n\n"
+        "⚡ <b>We have the fastest customer support!</b>\n\n"
         "If you have any issues with your purchase or deposit, "
         "feel free to contact us. Our team is online 24/7."
     )
     
     builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="≡ƒôó Our Channel", url="https://t.me/YourChannel"))
-    builder.row(InlineKeyboardButton(text="≡ƒæ¿ΓÇì≡ƒÆ╗ Bot Owner", url="https://t.me/YourSupportUser"))
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="📢 Our Channel", url="https://t.me/YourChannel"))
+    builder.row(InlineKeyboardButton(text="👨‍💻 Bot Owner", url="https://t.me/YourSupportUser"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
@@ -812,16 +767,16 @@ async def process_main_menu(callback: types.CallbackQuery, state: FSMContext):
     if callback.message.photo:
         await callback.message.delete()
         await callback.message.answer(
-            f"<b><i>Welcome back! ≡ƒîƒ</i></b>\n\n"
-            "≡ƒÆá <b>Select an option below:</b>",
+            f"<b><i>Welcome back! 🌟</i></b>\n\n"
+            "💠 <b>Select an option below:</b>",
             reply_markup=get_main_menu(is_admin=is_admin),
             parse_mode="HTML"
         )
     else:
         # Regular text message, can edit
         await callback.message.edit_text(
-            f"<b><i>Welcome back! ≡ƒîƒ</i></b>\n\n"
-            "≡ƒÆá <b>Select an option below:</b>",
+            f"<b><i>Welcome back! 🌟</i></b>\n\n"
+            "💠 <b>Select an option below:</b>",
             reply_markup=get_main_menu(is_admin=is_admin),
             parse_mode="HTML"
         )
@@ -846,7 +801,7 @@ async def process_buy_id(callback: types.CallbackQuery):
             return
 
         if user.balance < country.price:
-            await callback.answer(f"Insufficient balance. You need Γé╣{country.price - user.balance} more.", show_alert=True)
+            await callback.answer(f"Insufficient balance. You need ₹{country.price - user.balance} more.", show_alert=True)
             return
 
         # Find available account
@@ -871,9 +826,9 @@ async def process_buy_id(callback: types.CallbackQuery):
         await session.commit()
 
         await callback.message.answer(
-            f"Γ£à <b>Purchase Successful!</b>\n\n"
-            f"≡ƒô▒ Phone: <code>{account.phone_number}</code>\n"
-            f"≡ƒöæ Session Data: <code>{account.session_data}</code>\n\n"
+            f"✅ <b>Purchase Successful!</b>\n\n"
+            f"📱 Phone: <code>{account.phone_number}</code>\n"
+            f"🔑 Session Data: <code>{account.session_data}</code>\n\n"
             "<i>Keep this safe!</i>",
             parse_mode="HTML"
         )
@@ -882,7 +837,7 @@ async def process_buy_id(callback: types.CallbackQuery):
 @dp.message()
 async def catch_all_handler(message: types.Message):
     await message.answer(
-        "ΓÜá∩╕Å <b>Please start the bot first!</b>\n"
+        "⚠️ <b>Please start the bot first!</b>\n"
         "Use the <b>/start</b> command to access the menu.",
         parse_mode="HTML"
     )
@@ -915,7 +870,7 @@ async def process_sessions(callback: types.CallbackQuery):
 
     if not countries_with_stock:
         await callback.message.edit_text(
-            "Γ¥î <b>No sessions available at the moment.</b>\n\n"
+            "❌ <b>No sessions available at the moment.</b>\n\n"
             "Please check back later or contact support.",
             reply_markup=get_back_to_main(),
             parse_mode="HTML"
@@ -926,13 +881,13 @@ async def process_sessions(callback: types.CallbackQuery):
     for item in countries_with_stock:
         country = item['country']
         stock = item['stock']
-        button_text = f"{country.emoji} {country.name} | ≡ƒôª {stock} Sessions"
+        button_text = f"{country.emoji} {country.name} | 📦 {stock} Sessions"
         builder.row(InlineKeyboardButton(text=button_text, callback_data=f"session_{country.id}"))
     
-    builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
     await callback.message.edit_text(
-        "≡ƒô▒ <b>Select a country to buy Sessions:</b>\n\n"
+        "📱 <b>Select a country to buy Sessions:</b>\n\n"
         "Only showing countries with available stock.",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
@@ -960,20 +915,20 @@ async def process_session_country(callback: types.CallbackQuery):
         available_stock = len(stock_res.scalars().all())
 
         # Show price, stock, and buy button
-        text = f"≡ƒÅ┤ <b>Country (Session):</b> {country.emoji} {country.name}\n"
-        text += f"≡ƒÆ╡ <b>Price per Session:</b> Γé╣{country.price}\n"
-        text += f"≡ƒôª <b>Available Stock:</b> {available_stock} Sessions\n\n"
+        text = f"🏴 <b>Country (Session):</b> {country.emoji} {country.name}\n"
+        text += f"💵 <b>Price per Session:</b> ₹{country.price}\n"
+        text += f"📦 <b>Available Stock:</b> {available_stock} Sessions\n\n"
         
         if available_stock > 0:
-            text += "Γ£à Click below to purchase session."
+            text += "✅ Click below to purchase session."
         else:
-            text += "Γ¥î Out of stock. Please check back later."
+            text += "❌ Out of stock. Please check back later."
         
         builder = InlineKeyboardBuilder()
         if available_stock > 0:
-            builder.row(InlineKeyboardButton(text="≡ƒ¢Æ Buy Session", callback_data=f"buy_sess_{country.id}"))
-        builder.row(InlineKeyboardButton(text="≡ƒöÖ Back", callback_data="btn_sessions"))
-        builder.row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+            builder.row(InlineKeyboardButton(text="🛒 Buy Session", callback_data=f"buy_sess_{country.id}"))
+        builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="btn_sessions"))
+        builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
         
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
@@ -1007,14 +962,14 @@ async def process_confirm_purchase(callback: types.CallbackQuery):
                 pass
             await bot.send_message(
                 callback.message.chat.id,
-                f"Γ¥î <b>Insufficient Balance!</b>\n\n"
-                f"≡ƒÆ░ Your Balance: Γé╣{user.balance}\n"
-                f"≡ƒÆ╡ Required: Γé╣{country.price}\n"
-                f"≡ƒÆ╕ Short by: Γé╣{country.price - user.balance}\n\n"
+                f"❌ <b>Insufficient Balance!</b>\n\n"
+                f"💰 Your Balance: ₹{user.balance}\n"
+                f"💵 Required: ₹{country.price}\n"
+                f"💸 Short by: ₹{country.price - user.balance}\n\n"
                 "Please deposit to continue.",
                 reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="≡ƒÆ░ Deposit", callback_data="btn_deposit"))
-                    .row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+                    .row(InlineKeyboardButton(text="💰 Deposit", callback_data="btn_deposit"))
+                    .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
                     .as_markup(),
                 parse_mode="HTML"
             )
@@ -1036,10 +991,10 @@ async def process_confirm_purchase(callback: types.CallbackQuery):
                 pass
             await bot.send_message(
                 callback.message.chat.id,
-                "Γ¥î <b>Out of Stock!</b>\n\n"
+                "❌ <b>Out of Stock!</b>\n\n"
                 f"Sorry, no {country.name} IDs available right now.",
                 reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="≡ƒöÖ Back", callback_data="btn_accounts"))
+                    .row(InlineKeyboardButton(text="🔙 Back", callback_data="btn_accounts"))
                     .as_markup(),
                 parse_mode="HTML"
             )
@@ -1065,25 +1020,25 @@ async def process_confirm_purchase(callback: types.CallbackQuery):
             pass
         await bot.send_message(
             callback.message.chat.id,
-            f"Γ£à <b>Purchase Successful!</b>\n\n"
-            f"≡ƒô▒ <b>Your Telegram ID:</b>\n"
+            f"✅ <b>Purchase Successful!</b>\n\n"
+            f"📱 <b>Your Telegram ID:</b>\n"
             f"<code>{account.phone_number}</code>\n\n"
-            f"≡ƒÆ░ <b>Paid:</b> Γé╣{country.price}\n"
-            f"≡ƒÆ│ <b>Remaining Balance:</b> Γé╣{user.balance}\n\n"
-            f"≡ƒôï <b>How to Login:</b>\n"
-            f"1∩╕ÅΓâú Open Telegram app\n"
-            f"2∩╕ÅΓâú Enter the phone number above\n"
-            f"3∩╕ÅΓâú Telegram will ask for OTP\n"
-            f"4∩╕ÅΓâú Click 'Get OTP Code' below\n"
-            f"5∩╕ÅΓâú We'll send you the code instantly!\n\n"
-            f"≡ƒæç <b>Ready to receive OTP?</b>",
+            f"💰 <b>Paid:</b> ₹{country.price}\n"
+            f"💳 <b>Remaining Balance:</b> ₹{user.balance}\n\n"
+            f"📋 <b>How to Login:</b>\n"
+            f"1️⃣ Open Telegram app\n"
+            f"2️⃣ Enter the phone number above\n"
+            f"3️⃣ Telegram will ask for OTP\n"
+            f"4️⃣ Click 'Get OTP Code' below\n"
+            f"5️⃣ We'll send you the code instantly!\n\n"
+            f"👇 <b>Ready to receive OTP?</b>",
             reply_markup=InlineKeyboardBuilder()
                 .row(InlineKeyboardButton(
-                    text="≡ƒô▓ Get OTP Code",
+                    text="📲 Get OTP Code",
                     callback_data=f"get_otp_{purchase.id}"
                 ))
                 .row(InlineKeyboardButton(
-                    text="≡ƒÅá Main Menu",
+                    text="🏠 Main Menu",
                     callback_data="btn_main_menu"
                 ))
                 .as_markup(),
@@ -1118,11 +1073,11 @@ async def process_get_otp(callback: types.CallbackQuery):
                 pass
             await bot.send_message(
                 callback.message.chat.id,
-                "Γ¥î <b>Error!</b>\n\n"
+                "❌ <b>Error!</b>\n\n"
                 "This account doesn't have session data configured.\n"
                 "Please contact support.",
                 reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+                    .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
                     .as_markup(),
                 parse_mode="HTML"
             )
@@ -1130,8 +1085,8 @@ async def process_get_otp(callback: types.CallbackQuery):
         
         # Start monitoring
         try:
-            logger.info(f"ΓÜí ATTEMPTING TO START MONITORING FOR {account.phone_number}")
-            print(f"ΓÜí ATTEMPTING TO START MONITORING FOR {account.phone_number}")
+            logger.info(f"⚡ ATTEMPTING TO START MONITORING FOR {account.phone_number}")
+            print(f"⚡ ATTEMPTING TO START MONITORING FOR {account.phone_number}")
             session_mgr = get_session_manager()
             await session_mgr.start_monitoring(
                 phone_number=account.phone_number,
@@ -1147,7 +1102,7 @@ async def process_get_otp(callback: types.CallbackQuery):
             # Send new message with OTP waiting screen
             new_message = await bot.send_message(
                 callback.message.chat.id,
-                "≡ƒöä <b>Starting OTP monitoring...</b>",
+                "🔄 <b>Starting OTP monitoring...</b>",
                 parse_mode="HTML"
             )
             
@@ -1160,17 +1115,17 @@ async def process_get_otp(callback: types.CallbackQuery):
             try:
                 await bot.send_message(
                     callback.message.chat.id,
-                    f"Γ¥î <b>Error!</b>\n\n"
+                    f"❌ <b>Error!</b>\n\n"
                     f"Failed to start OTP monitoring: {str(e)}\n\n"
                     "Please try again or contact support.",
                     reply_markup=InlineKeyboardBuilder()
-                        .row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+                        .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
                         .as_markup(),
                     parse_mode="HTML"
                 )
             except Exception as send_err:
                 logger.error(f"Could not send error message: {send_err}")
-                await callback.answer("Γ¥î Error occurred. Please try again.", show_alert=True)
+                await callback.answer("❌ Error occurred. Please try again.", show_alert=True)
 
 
 async def show_otp_waiting(message: types.Message, phone_number: str, purchase_id: int, attempt: int = 0):
@@ -1180,30 +1135,23 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
     # Check if login successful
     login_status = await session_mgr.check_login_status(phone_number)
     if login_status == "LOGGED_IN":
-        # Use delete+send to avoid "message not modified" error
-        try:
-            await message.delete()
-        except:
-            pass
-        
-        await bot.send_message(
-            message.chat.id,
-            f"≡ƒÄë <b>LOGIN DONE SUCCESSFULLY!</b>\n\n"
-            f"≡ƒÖÅ <b>Thanks for Purchasing!</b>\n\n"
-            f"≡ƒô▒ <b>Phone:</b> <code>{phone_number}</code>\n"
-            f"Γ£à <b>Status:</b> Login Verified\n\n"
-            f"≡ƒÄè <b>Congratulations!</b>\n"
+        await message.edit_text(
+            f"🎉 <b>LOGIN DONE SUCCESSFULLY!</b>\n\n"
+            f"🙏 <b>Thanks for Purchasing!</b>\n\n"
+            f"📱 <b>Phone:</b> <code>{phone_number}</code>\n"
+            f"✅ <b>Status:</b> Login Verified\n\n"
+            f"🎊 <b>Congratulations!</b>\n"
             f"Your Telegram account is now active and ready to use!\n\n"
-            f"≡ƒÆí <b>Important Notes:</b>\n"
-            f"ΓÇó Account is fully yours now\n"
-            f"ΓÇó Keep your password secure\n"
-            f"ΓÇó Don't share session data\n"
-            f"ΓÇó Follow Telegram's Terms of Service\n\n"
-            f"Γ£¿ <b>Enjoy your new Telegram account!</b>",
+            f"💡 <b>Important Notes:</b>\n"
+            f"• Account is fully yours now\n"
+            f"• Keep your password secure\n"
+            f"• Don't share session data\n"
+            f"• Follow Telegram's Terms of Service\n\n"
+            f"✨ <b>Enjoy your new Telegram account!</b>",
             reply_markup=InlineKeyboardBuilder()
-                .row(InlineKeyboardButton(text="≡ƒ¢á∩╕Å Manage Sessions", callback_data=f"manage_sess_{purchase_id}"))
-                .row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
-                .row(InlineKeyboardButton(text="≡ƒ¢ì∩╕Å Buy More", callback_data="btn_accounts"))
+                .row(InlineKeyboardButton(text="🛠️ Manage Sessions", callback_data=f"manage_sess_{purchase_id}"))
+                .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
+                .row(InlineKeyboardButton(text="🛍️ Buy More", callback_data="btn_accounts"))
                 .as_markup(),
             parse_mode="HTML"
         )
@@ -1230,36 +1178,36 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
                     twofa_password = account.twofa_password
         
         # Build message with OTP and optional 2FA password
-        text = f"Γ£à <b>OTP Code Received!</b>\n\n"
-        text += f"≡ƒô▒ <b>Phone:</b> <code>{phone_number}</code>\n"
-        text += f"≡ƒöæ <b>OTP Code:</b> <code>{otp_code}</code>\n"
+        text = f"✅ <b>OTP Code Received!</b>\n\n"
+        text += f"📱 <b>Phone:</b> <code>{phone_number}</code>\n"
+        text += f"🔑 <b>OTP Code:</b> <code>{otp_code}</code>\n"
         
         if twofa_password:
-            text += f"≡ƒöÉ <b>2FA Password:</b> <code>{twofa_password}</code>\n"
+            text += f"🔐 <b>2FA Password:</b> <code>{twofa_password}</code>\n"
         
-        text += f"\n≡ƒôï <b>Next Steps:</b>\n"
-        text += f"1∩╕ÅΓâú Copy the OTP code above\n"
-        text += f"2∩╕ÅΓâú Enter it in Telegram app\n"
+        text += f"\n📋 <b>Next Steps:</b>\n"
+        text += f"1️⃣ Copy the OTP code above\n"
+        text += f"2️⃣ Enter it in Telegram app\n"
         
         if twofa_password:
-            text += f"3∩╕ÅΓâú Enter the 2FA password when asked\n"
-            text += f"4∩╕ÅΓâú Wait for login verification...\n\n"
+            text += f"3️⃣ Enter the 2FA password when asked\n"
+            text += f"4️⃣ Wait for login verification...\n\n"
         else:
-            text += f"3∩╕ÅΓâú Wait for login verification...\n\n"
+            text += f"3️⃣ Wait for login verification...\n\n"
         
-        text += f"≡ƒöä <i>Auto-detecting login status...</i>\n"
-        text += f"≡ƒÆí <i>Click 'Resend Code' if needed</i>"
+        text += f"🔄 <i>Auto-detecting login status...</i>\n"
+        text += f"💡 <i>Click 'Resend Code' if needed</i>"
         
         # OTP received, show it with resend button
         await message.edit_text(
             text,
             reply_markup=InlineKeyboardBuilder()
                 .row(InlineKeyboardButton(
-                    text="≡ƒöä Resend Code",
+                    text="🔄 Resend Code",
                     callback_data=f"resend_otp_{purchase_id}"
                 ))
                 .row(InlineKeyboardButton(
-                    text="ΓÅ╣∩╕Å Stop Monitoring",
+                    text="⏹️ Stop Monitoring",
                     callback_data="btn_main_menu"
                 ))
                 .as_markup(),
@@ -1275,17 +1223,17 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
 
     # No OTP yet - show waiting message with manual check button
     text = (
-        f"ΓÅ│ <b>Waiting for your login...</b>\n\n"
-        f"≡ƒô▒ <b>Phone:</b> <code>{phone_number}</code>\n\n"
-        f"≡ƒôï <b>How to Login:</b>\n"
-        f"1∩╕ÅΓâú Open <b>Telegram App</b> on your device\n"
-        f"2∩╕ÅΓâú Tap '<b>Start Messaging</b>'\n"
-        f"3∩╕ÅΓâú Enter this phone: <code>{phone_number}</code>\n"
-        f"4∩╕ÅΓâú Request the verification code\n"
-        f"5∩╕ÅΓâú Click 'Check for Code' button below!\n\n"
-        f"≡ƒÆí <i>Session monitoring is active</i>\n"
-        f"≡ƒöä <i>Auto-checking... ({attempt}/24)</i>\n"
-        f"ΓÅ▒∩╕Å <i>Refreshed: {current_time}</i>"
+        f"⏳ <b>Waiting for your login...</b>\n\n"
+        f"📱 <b>Phone:</b> <code>{phone_number}</code>\n\n"
+        f"📋 <b>How to Login:</b>\n"
+        f"1️⃣ Open <b>Telegram App</b> on your device\n"
+        f"2️⃣ Tap '<b>Start Messaging</b>'\n"
+        f"3️⃣ Enter this phone: <code>{phone_number}</code>\n"
+        f"4️⃣ Request the verification code\n"
+        f"5️⃣ Click 'Check for Code' button below!\n\n"
+        f"💡 <i>Session monitoring is active</i>\n"
+        f"🔄 <i>Auto-checking... ({attempt}/24)</i>\n"
+        f"⏱️ <i>Refreshed: {current_time}</i>"
     )
     
     try:
@@ -1293,8 +1241,8 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
              await message.edit_text(
                 text,
                 reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="≡ƒöì Check Code", callback_data=f"check_otp_{purchase_id}"))
-                    .row(InlineKeyboardButton(text="ΓÅ╣∩╕Å Stop Waiting", callback_data="btn_main_menu"))
+                    .row(InlineKeyboardButton(text="🔍 Check Code", callback_data=f"check_otp_{purchase_id}"))
+                    .row(InlineKeyboardButton(text="⏹️ Stop Waiting", callback_data="btn_main_menu"))
                     .as_markup(),
                 parse_mode="HTML"
             )
@@ -1302,8 +1250,8 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
             await message.edit_text(
                 text,
                 reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="≡ƒöì Check Code", callback_data=f"check_otp_{purchase_id}"))
-                    .row(InlineKeyboardButton(text="ΓÅ╣∩╕Å Stop Waiting", callback_data="btn_main_menu"))
+                    .row(InlineKeyboardButton(text="🔍 Check Code", callback_data=f"check_otp_{purchase_id}"))
+                    .row(InlineKeyboardButton(text="⏹️ Stop Waiting", callback_data="btn_main_menu"))
                     .as_markup(),
                 parse_mode="HTML"
             )
@@ -1318,12 +1266,12 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
         await show_otp_waiting(message, phone_number, purchase_id, attempt + 1)
     else:
          await message.edit_text(
-            f"Γ¥î <b>Timeout!</b>\n\n"
+            f"❌ <b>Timeout!</b>\n\n"
             f"We waited 2 minutes but didn't receive the code.\n"
             f"Please try again or contact support.",
             reply_markup=InlineKeyboardBuilder()
-                 .row(InlineKeyboardButton(text="≡ƒöä Try Again", callback_data=f"get_otp_{purchase_id}"))
-                 .row(InlineKeyboardButton(text="≡ƒÅá Main Menu", callback_data="btn_main_menu"))
+                 .row(InlineKeyboardButton(text="🔄 Try Again", callback_data=f"get_otp_{purchase_id}"))
+                 .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
                  .as_markup(),
             parse_mode="HTML"
         )
@@ -1441,7 +1389,7 @@ async def process_manage_session(callback: types.CallbackQuery):
     """List active sessions for a purchase"""
     purchase_id = int(callback.data.split("_")[2])
     
-    await callback.message.edit_text("≡ƒöä <b>Connecting to Telegram...</b>\n\nPlease wait while we fetch active sessions...", parse_mode="HTML")
+    await callback.message.edit_text("🔄 <b>Connecting to Telegram...</b>\n\nPlease wait while we fetch active sessions...", parse_mode="HTML")
     
     async with async_session() as session:
         # Get Purchase -> Account -> Session String
@@ -1450,7 +1398,7 @@ async def process_manage_session(callback: types.CallbackQuery):
         purchase = res.scalar_one_or_none()
         
         if not purchase:
-            await callback.message.edit_text("Γ¥î Purchase not found.", reply_markup=get_back_to_main())
+            await callback.message.edit_text("❌ Purchase not found.", reply_markup=get_back_to_main())
             return
             
         stmt_acc = select(Account).where(Account.id == purchase.account_id)
@@ -1458,7 +1406,7 @@ async def process_manage_session(callback: types.CallbackQuery):
         account = res_acc.scalar_one_or_none()
         
         if not account or not account.session_data:
-            await callback.message.edit_text("Γ¥î No session data found for this account.", reply_markup=get_back_to_main())
+            await callback.message.edit_text("❌ No session data found for this account.", reply_markup=get_back_to_main())
             return
 
         try:
@@ -1466,11 +1414,11 @@ async def process_manage_session(callback: types.CallbackQuery):
             sessions = await dm.get_active_sessions(account.session_data)
             
             if not sessions:
-                await callback.message.edit_text("Γ¥î No active sessions found (weird).", reply_markup=get_back_to_main())
+                await callback.message.edit_text("❌ No active sessions found (weird).", reply_markup=get_back_to_main())
                 return
                 
-            text = f"≡ƒô▒ <b>Active Sessions for {account.phone_number}</b>\n\n"
-            text += "<i>Click 'Γ¥î' to revoke a device instantly.</i>\n\n"
+            text = f"📱 <b>Active Sessions for {account.phone_number}</b>\n\n"
+            text += "<i>Click '❌' to revoke a device instantly.</i>\n\n"
             
             builder = InlineKeyboardBuilder()
             
@@ -1481,34 +1429,34 @@ async def process_manage_session(callback: types.CallbackQuery):
                 device_name = f"{sess['device_model']} ({sess['platform']})"
                 ip = sess['ip']
                 
-                status_icon = "≡ƒƒó" if is_current else "ΓÜ¬"
+                status_icon = "🟢" if is_current else "⚪"
                 
                 # Build device button with X for removal
                 if not is_current:
-                    # Format: "Device Name     Γ¥î"
-                    btn_text = f"{sess['device_model'][:20]}... Γ¥î"
+                    # Format: "Device Name     ❌"
+                    btn_text = f"{sess['device_model'][:20]}... ❌"
                     builder.row(InlineKeyboardButton(
                         text=btn_text,
                         callback_data=f"kill_sess_{purchase_id}_{sess['hash']}"
                     ))
                     text += f"{status_icon} {device_name}\n"
-                    text += f"   Γöö IP: {ip}\n\n"
+                    text += f"   └ IP: {ip}\n\n"
                 else:
                     # Current session - no delete button
                     text += f"{status_icon} {device_name} (Current)\n"
-                    text += f"   Γöö IP: {ip}\n\n"
+                    text += f"   └ IP: {ip}\n\n"
             
-            text += f"≡ƒÆí <i>Tap Γ¥î to remove a device</i>\n"
+            text += f"💡 <i>Tap ❌ to remove a device</i>\n"
             
-            builder.row(InlineKeyboardButton(text="≡ƒöä Refresh", callback_data=f"manage_sess_{purchase_id}"))
-            builder.row(InlineKeyboardButton(text="≡ƒöÖ Back", callback_data="btn_purchases"))
+            builder.row(InlineKeyboardButton(text="🔄 Refresh", callback_data=f"manage_sess_{purchase_id}"))
+            builder.row(InlineKeyboardButton(text="🔙 Back", callback_data="btn_purchases"))
             
             await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
             
         except Exception as e:
             logger.error(f"Error managing sessions: {e}")
             await callback.message.edit_text(
-                f"Γ¥î <b>Error fetching sessions</b>\n\n{str(e)}",
+                f"❌ <b>Error fetching sessions</b>\n\n{str(e)}",
                 reply_markup=get_back_to_main(),
                 parse_mode="HTML"
             )
@@ -1541,11 +1489,11 @@ async def process_kill_session(callback: types.CallbackQuery):
             success = await dm.terminate_session(account.session_data, session_hash)
             
             if success:
-                await callback.answer("Γ£à Device revoked successfully!", show_alert=True)
+                await callback.answer("✅ Device revoked successfully!", show_alert=True)
                 # Refresh list
                 await process_manage_session(callback)
             else:
-                await callback.answer("Γ¥î Failed to revoke.", show_alert=True)
+                await callback.answer("❌ Failed to revoke.", show_alert=True)
                 
         except Exception as e:
             logger.error(f"Error killing session: {e}")
