@@ -32,38 +32,41 @@ dp = Dispatcher()
 @dp.errors()
 async def error_handler(event: types.ErrorEvent):
     """
-    Global error handler for all unhandled exceptions.
-    Uses ErrorEvent to get both update and exception.
+    BULLETPROOF error handler - catches ALL exceptions and prevents bot crashes.
+    This ensures the bot NEVER stops working, no matter what error occurs.
     """
-    update = event.update
-    exception = event.exception
-    logger.error(f"❌ Error handling update {update.update_id if update else 'Unknown'}: {exception}", exc_info=True)
-    
-    # Try to notify user of error if it's a callback or message update
     try:
-        if update:
-            # update is already the parameter
-            
-            # Try to send error message to user
-            chat_id = None
-            if update.message:
-                chat_id = update.message.chat.id
-            elif update.callback_query:
-                chat_id = update.callback_query.message.chat.id
-            
-            if chat_id:
-                try:
-                    await bot.send_message(
-                        chat_id,
-                        "⚠️ An error occurred. Please try again or contact support if the issue persists.",
-                        reply_markup=get_back_to_main()
-                    )
-                except:
-                    pass  # If we can't send the message, just log it
-    except Exception as e:
-        logger.error(f"Error in error handler: {e}")
+        update = event.update
+        exception = event.exception
+        logger.error(f"❌ Error handling update {update.update_id if update else 'Unknown'}: {exception}", exc_info=True)
+        
+        # Try to notify user of error if it's a callback or message update
+        try:
+            if update:
+                chat_id = None
+                if update.message:
+                    chat_id = update.message.chat.id
+                elif update.callback_query:
+                    chat_id = update.callback_query.message.chat.id
+                
+                if chat_id:
+                    try:
+                        await bot.send_message(
+                            chat_id,
+                            "⚠️ An error occurred. Please try again or contact support if the issue persists.",
+                            reply_markup=get_back_to_main()
+                        )
+                    except Exception as send_error:
+                        logger.error(f"Could not send error message to user: {send_error}")
+        except Exception as notify_error:
+            logger.error(f"Error in error notification: {notify_error}")
     
-    # Return True to mark error as handled and prevent bot crash
+    except Exception as handler_error:
+        # Even if the error handler itself fails, log it and continue
+        logger.critical(f"CRITICAL: Error handler itself failed: {handler_error}", exc_info=True)
+    
+    # CRITICAL: Always return True to mark error as handled
+    # This prevents aiogram from crashing the bot
     return True
 
 # --- FSM States ---
