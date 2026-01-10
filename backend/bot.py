@@ -808,13 +808,23 @@ async def confirm_purchase_handler(callback: types.CallbackQuery):
         if account.twofa_password:
             text += f"🔐 <b>2FA Password:</b> <code>{account.twofa_password}</code>\n"
         
-        # Try to get OTP code (if session is active)
-        otp_code = "⏳ Requesting..."
+        # Fetch REAL OTP code
+        otp_code = "⏳ Fetching..."
         try:
-            # TODO: Implement Pyrogram OTP fetching
-            # For now, show placeholder
-            otp_code = "Check Telegram app"
-        except:
+            from backend.otp_fetcher import get_latest_otp_code
+            api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
+            api_hash = os.getenv("TELEGRAM_API_HASH", "")
+            
+            if account.session_data and api_id and api_hash:
+                fetched_code = await get_latest_otp_code(account.session_data, api_id, api_hash)
+                if fetched_code:
+                    otp_code = f"🔢 {fetched_code}"  # Add emoji to code
+                else:
+                    otp_code = "Check Telegram app"
+            else:
+                otp_code = "Check Telegram app"
+        except Exception as e:
+            logger.error(f"OTP fetch error in purchase: {e}")
             otp_code = "Check Telegram app"
         
         text += f"\n📨 <b>Login Code:</b> <code>{otp_code}</code>\n"
@@ -2676,17 +2686,6 @@ async def retry_code_handler(callback: types.CallbackQuery):
         except:
             otp_code = "Check Telegram app"
         
-        text = f"ðŸ”„ <b>Retry Login Code</b>\n\n"
-        text += f"ðŸ“± <b>Phone:</b> <code>{account.phone_number}</code>\n"
-        if account.twofa_password:
-            text += f"ðŸ” <b>2FA:</b> <code>{account.twofa_password}</code>\n"
-        text += f"\nðŸ“¨ <b>Login Code:</b> <code>{otp_code}</code>\n\n"
-        text += "ðŸ’¡ <i>A new login code has been requested. Check your Telegram app!</i>"
-        
-        builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(text="ðŸ”„ Retry Again", callback_data=f"retry_code_{account_id}"))
-        builder.row(InlineKeyboardButton(text="ðŸ“± Manage Devices", callback_data=f"manage_devices_{account_id}"))
-        builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
         
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
         await callback.answer("ðŸ“¨ New code requested!")
