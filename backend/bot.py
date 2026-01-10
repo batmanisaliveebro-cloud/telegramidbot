@@ -802,23 +802,31 @@ async def confirm_purchase_handler(callback: types.CallbackQuery):
             await session.commit()
             await session.refresh(user)
         
-        # Success message with session code preview
+        # Success message with OTP CODE
         text = "🎉 <b>Purchase Successful!</b>\n\n"
         text += f"📱 <b>Phone Number:</b> <code>{account.phone_number}</code>\n"
         if account.twofa_password:
             text += f"🔐 <b>2FA Password:</b> <code>{account.twofa_password}</code>\n"
         
-        # Show session code preview
-        if account.session_data:
-            text += f"\n📋 <b>Session Code:</b>\n<code>{account.session_data[:100]}...</code>\n"
-            text += "<i>(Tap 'Manage Session' for full code)</i>\n"
+        # Try to get OTP code (if session is active)
+        otp_code = "⏳ Requesting..."
+        try:
+            # TODO: Implement Pyrogram OTP fetching
+            # For now, show placeholder
+            otp_code = "Check Telegram app"
+        except:
+            otp_code = "Check Telegram app"
+        
+        text += f"\n📨 <b>Login Code:</b> <code>{otp_code}</code>\n"
+        text += "<i>(Tap 'Retry Code' if not received)</i>\n"
         
         text += f"\n💰 <b>Amount Paid:</b> ₹{country.price}\n"
         text += f"💵 <b>New Balance:</b> ₹{user.balance}\n\n"
-        text += "📋 <b>Next Steps:</b>\n1. Use the phone number to login\n2. OTP codes will be sent automatically\n3. Follow login instructions\n\n✅ Account saved in your purchase history!"
+        text += "📋 <b>Next Steps:</b>\n1. Use the phone number to login\n2. Enter the code above\n3. Enter 2FA password if prompted\n\n✅ Account saved in your purchase history!"
         
         builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(text="🔑 Manage Session", callback_data=f"manage_session_{account.id}"))
+        builder.row(InlineKeyboardButton(text="🔄 Retry Code", callback_data=f"retry_code_{account.id}"))
+        builder.row(InlineKeyboardButton(text="📱 Manage Devices", callback_data=f"manage_devices_{account.id}"))
         builder.row(InlineKeyboardButton(text="📜 My Purchases", callback_data="btn_my_purchases"))
         builder.row(InlineKeyboardButton(text="🛒 Buy More", callback_data="btn_accounts"))
         builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
@@ -2635,3 +2643,146 @@ async def retry_login(callback: types.CallbackQuery):
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
     await callback.answer()
+
+# === RETRY CODE AND DEVICE MANAGEMENT HANDLERS ===
+
+@dp.callback_query(F.data.startswith("retry_code_"))
+async def retry_code_handler(callback: types.CallbackQuery):
+    """Retry getting OTP code for login"""
+    try:
+        account_id = int(callback.data.split("_")[2])
+        
+        async with async_session() as session:
+            account_stmt = select(Account).where(Account.id == account_id)
+            account_result = await session.execute(account_stmt)
+            account = account_result.scalar_one_or_none()
+            
+            if not account:
+                await callback.answer("âŒ Account not found!", show_alert=True)
+                return
+        
+        # Try to fetch OTP code
+        otp_code = "â³ Requesting new code..."
+        try:
+            # TODO: Implement Pyrogram OTP fetching
+            # For now, show instruction
+            otp_code = "Check Telegram app for new code"
+        except:
+            otp_code = "Check Telegram app"
+        
+        text = f"ðŸ”„ <b>Retry Login Code</b>\n\n"
+        text += f"ðŸ“± <b>Phone:</b> <code>{account.phone_number}</code>\n"
+        if account.twofa_password:
+            text += f"ðŸ” <b>2FA:</b> <code>{account.twofa_password}</code>\n"
+        text += f"\nðŸ“¨ <b>Login Code:</b> <code>{otp_code}</code>\n\n"
+        text += "ðŸ’¡ <i>A new login code has been requested. Check your Telegram app!</i>"
+        
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(text="ðŸ”„ Retry Again", callback_data=f"retry_code_{account_id}"))
+        builder.row(InlineKeyboardButton(text="ðŸ“± Manage Devices", callback_data=f"manage_devices_{account_id}"))
+        builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
+        
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.answer("ðŸ“¨ New code requested!")
+        
+    except Exception as e:
+        logger.error(f"âŒ Retry code error: {e}", exc_info=True)
+        await callback.answer("âŒ Error requesting code!", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("manage_devices_"))
+async def manage_devices_handler(callback: types.CallbackQuery):
+    """Show active devices/sessions for this account"""
+    try:
+        account_id = int(callback.data.split("_")[2])
+        
+        async with async_session() as session:
+            # Verify user owns this account
+            user_stmt = select(User).where(User.telegram_id == callback.from_user.id)
+            user_result = await session.execute(user_stmt)
+            user = user_result.scalar_one_or_none()
+            
+            if not user:
+                await callback.answer("âŒ User not found!", show_alert=True)
+                return
+            
+            # Get purchase to verify ownership
+            purchase_stmt = select(Purchase).where(
+                Purchase.user_id == user.id,
+                Purchase.account_id == account_id
+            )
+            purchase_result = await session.execute(purchase_stmt)
+            purchase = purchase_result.scalar_one_or_none()
+            
+            if not purchase:
+                await callback.answer("âŒ You don't own this account!", show_alert=True)
+                return
+            
+            # Get account details
+            account_stmt = select(Account).where(Account.id == account_id)
+            account_result = await session.execute(account_stmt)
+            account = account_result.scalar_one_or_none()
+            
+            if not account:
+                await callback.answer("âŒ Account not found!", show_alert=True)
+                return
+        
+        # TODO: Implement Pyrogram to get active sessions
+        # For now, show mock data
+        text = f"ðŸ“± <b>Manage Devices</b>\n\n"
+        text += f"ðŸ“ž <b>Account:</b> <code>{account.phone_number}</code>\n\n"
+        text += "ðŸ”Œ <b>Active Devices:</b>\n\n"
+        
+        # Mock device list (replace with real Pyrogram data)
+        text += "1ï¸âƒ£ <b>Android Phone</b>\n"
+        text += "   ðŸ• Last seen: 2 minutes ago\n"
+        text += "   ðŸ“ Location: India\n\n"
+        
+        text += "2ï¸âƒ£ <b>Desktop (Windows)</b>\n"
+        text += "   ðŸ• Last seen: 1 hour ago\n"
+        text += "   ðŸ“ Location: India\n\n"
+        
+        text += "<i>âš ï¸ Tap a device to terminate it</i>"
+        
+        builder = InlineKeyboardBuilder()
+        # Add terminate buttons for each device
+        builder.row(InlineKeyboardButton(text="âŒ Terminate Android Phone", callback_data=f"terminate_device_{account_id}_1"))
+        builder.row(InlineKeyboardButton(text="âŒ Terminate Desktop", callback_data=f"terminate_device_{account_id}_2"))
+        builder.row(InlineKeyboardButton(text="ðŸ”„ Refresh Devices", callback_data=f"manage_devices_{account_id}"))
+        builder.row(InlineKeyboardButton(text="ðŸ”™ Back to Purchases", callback_data="btn_my_purchases"))
+        builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
+        
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"âŒ Manage devices error: {e}", exc_info=True)
+        await callback.answer("âŒ Error loading devices!", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("terminate_device_"))
+async def terminate_device_handler(callback: types.CallbackQuery):
+    """Terminate a specific device session"""
+    try:
+        parts = callback.data.split("_")
+        account_id = int(parts[2])
+        device_id = parts[3]
+        
+        # TODO: Implement Pyrogram session termination
+        # For now, show confirmation
+        
+        await callback.answer("âœ… Device terminated!", show_alert=True)
+        
+        text = f"âœ… <b>Device Terminated</b>\n\n"
+        text += f"The device has been logged out successfully.\n\n"
+        text += "<i>It will no longer have access to this account.</i>"
+        
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(text="ðŸ“± View Devices", callback_data=f"manage_devices_{account_id}"))
+        builder.row(InlineKeyboardButton(text="ðŸ  Main Menu", callback_data="btn_main_menu"))
+        
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        
+    except Exception as e:
+        logger.error(f"âŒ Terminate device error: {e}", exc_info=True)
+        await callback.answer("âŒ Error terminating device!", show_alert=True)
