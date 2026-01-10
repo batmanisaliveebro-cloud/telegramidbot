@@ -2664,9 +2664,15 @@ async def retry_code_handler(callback: types.CallbackQuery):
         # Try to fetch OTP code
         otp_code = "â³ Requesting new code..."
         try:
-            # TODO: Implement Pyrogram OTP fetching
-            # For now, show instruction
-            otp_code = "Check Telegram app for new code"
+            from backend.otp_fetcher import get_latest_otp_code
+            api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
+            api_hash = os.getenv("TELEGRAM_API_HASH", "")
+            
+            if account.session_data and api_id and api_hash:
+                fetched_code = await get_latest_otp_code(account.session_data, api_id, api_hash)
+                otp_code = fetched_code if fetched_code else "No code found"
+            else:
+                otp_code = "Session not available"
         except:
             otp_code = "Check Telegram app"
         
