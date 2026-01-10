@@ -1,5 +1,6 @@
-
+```python
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
 from .models import Base
 import os
 from dotenv import load_dotenv
@@ -16,6 +17,8 @@ if not DB_URL:
 if "postgresql" in DB_URL and "asyncpg" not in DB_URL:
     DB_URL = DB_URL.replace("postgresql://", "postgresql+asyncpg://")
 
+# CRITICAL: Increased pool size and added recycling for bot + admin panel stability
+# This prevents connection exhaustion when both bot and admin panel are active
 engine = create_async_engine(
     DB_URL, 
     echo=True,
