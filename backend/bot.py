@@ -117,9 +117,53 @@ def get_main_menu(is_admin=False):
     return builder.as_markup()
 
 def get_back_to_main():
+    """Return a simple back to main menu button"""
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     return builder.as_markup()
+
+async def check_channel_membership(user_id: int) -> bool:
+    """Check if user is a member of the required channel"""
+    try:
+        async with async_session() as session:
+            channel_setting = await session.execute(
+                select(Settings).where(Settings.key == "bot_channel_link")
+            )
+            setting = channel_setting.scalar_one_or_none()
+            
+            if not setting or not setting.value:
+                return True  # No channel configured
+            
+            channel_username = setting.value
+            if "t.me/" in channel_username:
+                channel_username = channel_username.split("t.me/")[-1]
+            if not channel_username.startswith("@"):
+                channel_username = f"@{channel_username}"
+            
+            try:
+                member = await bot.get_chat_member(channel_username, user_id)
+                return member.status in ["creator", "administrator", "member"]
+            except:
+                return True  # Fail open on error
+                
+    except Exception as e:
+        logger.error(f"Error in check_channel_membership: {e}")
+        return True
+
+async def show_force_join_message(message_or_callback, channel_link: str):
+    """Show force join message with buttons"""
+    text = "🔒 <b>Channel Membership Required</b>\n\n"
+    text += "To use this bot, you must join our official channel first!\n\n"
+    text += "📢 Click the button below to join, then click 'Check' to verify."
+    
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="📢 Join Channel", url=channel_link))
+    builder.row(InlineKeyboardButton(text="✅ Check Membership", callback_data="check_membership"))
+    
+    if isinstance(message_or_callback, types.CallbackQuery):
+        await message_or_callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    else:
+        await message_or_callback.answer(text,reply_markup=builder.as_markup(), parse_mode="HTML")
 
 # --- Handlers ---
 
@@ -148,7 +192,24 @@ async def safe_edit_message(callback, text, reply_markup=None, parse_mode="HTML"
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    """Handle /start command with force join check"""
     logger.info(f"Received /start from {message.from_user.id}")
+    
+    # Check channel membership first
+    is_member = await check_channel_membership(message.from_user.id)
+    
+    if not is_member:
+        async with async_session() as session:
+            channel_setting = await session.execute(
+                select(Settings).where(Settings.key == "bot_channel_link")
+            )
+            setting = channel_setting.scalar_one_or_none()
+            channel_link = setting.value if setting else "https://t.me/yourchannel"
+        
+        await show_force_join_message(message, channel_link)
+        return
+    
+    # User is member, continue with normal start
     is_admin = False
     try:
         async with async_session() as session:
@@ -156,7 +217,6 @@ async def cmd_start(message: types.Message):
             result = await session.execute(stmt)
             user = result.scalar_one_or_none()
 
-            # Check if this telegram ID should be admin
             # Check if this telegram ID should be admin
             admin_telegram_id = os.getenv("ADMIN_TELEGRAM_ID", "").strip()
             user_id_str = str(message.from_user.id)
@@ -169,7 +229,8 @@ async def cmd_start(message: types.Message):
                     telegram_id=message.from_user.id,
                     username=message.from_user.username,
                     full_name=message.from_user.full_name,
-                    is_admin=should_be_admin
+                    is_admin=should_be_admin,
+                    balance=0.0 # New users start with 0 balance
                 )
                 session.add(user)
             elif user.is_admin != should_be_admin:
