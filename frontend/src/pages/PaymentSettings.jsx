@@ -11,6 +11,8 @@ const PaymentSettings = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
+    const [webhookFixing, setWebhookFixing] = useState(false);
+    const [webhookMessage, setWebhookMessage] = useState('');
     const navigate = useNavigate();
 
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -80,6 +82,29 @@ const PaymentSettings = () => {
             setMessage('❌ Failed to save settings.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleFixWebhook = async () => {
+        setWebhookFixing(true);
+        setWebhookMessage('');
+
+        try {
+            const response = await axios.post(`${API_BASE}/api/fix-webhook`);
+
+            if (response.data.success) {
+                setWebhookMessage(`✅ ${response.data.message}`);
+                if (response.data.webhook_info) {
+                    console.log('Webhook Info:', response.data.webhook_info);
+                }
+            } else {
+                setWebhookMessage(`❌ ${response.data.message}`);
+            }
+        } catch (error) {
+            console.error("Error fixing webhook:", error);
+            setWebhookMessage('❌ Failed to fix webhook. Check backend logs.');
+        } finally {
+            setWebhookFixing(false);
         }
     };
 
@@ -216,6 +241,35 @@ const PaymentSettings = () => {
                     )}
 
                 </form>
+            </div>
+
+            {/* Webhook Fix Section */}
+            <div className="mt-8 bg-slate-800 rounded-xl p-6 border border-slate-700">
+                <h3 className="text-xl font-bold text-white mb-4">🔗 Webhook Management</h3>
+                <p className="text-slate-400 text-sm mb-6">
+                    Use this button after every deployment to refresh the webhook connection.
+                    This ensures the bot always responds to messages.
+                </p>
+
+                <button
+                    onClick={handleFixWebhook}
+                    disabled={webhookFixing}
+                    className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${webhookFixing
+                            ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-900/50'
+                        }`}
+                >
+                    {webhookFixing ? '🔄 Fixing Webhook...' : '🔧 Fix Webhook Now'}
+                </button>
+
+                {webhookMessage && (
+                    <div className={`mt-4 p-4 rounded-lg text-center font-medium ${webhookMessage.includes('✅')
+                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                        {webhookMessage}
+                    </div>
+                )}
             </div>
 
             <div className="mt-8 bg-blue-500/10 border border-blue-500/20 p-6 rounded-xl">

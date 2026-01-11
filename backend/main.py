@@ -194,6 +194,74 @@ async def startup_event():
 async def health_check():
     return {"status": "ok", "mode": "webhook", "service": "Telegram Bot Backend"}
 
+
+@app.post("/api/fix-webhook")
+async def fix_webhook_endpoint():
+    """
+    Manual webhook fix endpoint for admin panel
+    Deletes old webhook and sets new one
+    """
+    try:
+        import os
+        import aiohttp
+        
+        bot_token = os.getenv("BOT_TOKEN")
+        webhook_url = os.getenv("WEBHOOK_URL", "https://doubtful-chelsae-decstorroyal-43b44335.koyeb.app/webhook")
+        
+        async with aiohttp.ClientSession() as session:
+            # Delete old webhook
+            delete_url = f"https://api.telegram.org/bot{bot_token}/deleteWebhook"
+            async with session.post(delete_url, json={"drop_pending_updates": True}) as response:
+                delete_result = await response.json()
+                logger.info(f"🗑️ Webhook deleted: {delete_result.get('ok', False)}")
+            
+            # Wait for Telegram to process
+            await asyncio.sleep(2)
+            
+            # Set new webhook
+            set_url = f"https://api.telegram.org/bot{bot_token}/setWebhook"
+            webhook_data = {
+                "url": webhook_url,
+                "drop_pending_updates": True,
+                "max_connections": 100,
+                "allowed_updates": ["message", "callback_query"]
+            }
+            
+            async with session.post(set_url, json=webhook_data) as response:
+                set_result = await response.json()
+                
+                if set_result.get('ok'):
+                    # Verify webhook
+                    verify_url = f"https://api.telegram.org/bot{bot_token}/getWebhookInfo"
+                    async with session.get(verify_url) as verify_response:
+                        verify_data = await verify_response.json()
+                        webhook_info = verify_data.get('result', {})
+                        
+                        logger.info(f"✅ Webhook fixed and verified: {webhook_url}")
+                        
+                        return {
+                            "success": True,
+                            "message": "Webhook fixed successfully!",
+                            "webhook_info": {
+                                "url": webhook_info.get('url'),
+                                "pending_updates": webhook_info.get('pending_update_count', 0),
+                                "max_connections": webhook_info.get('max_connections', 0)
+                            }
+                        }
+                else:
+                    logger.error(f"❌ Failed to set webhook: {set_result}")
+                    return {
+                        "success": False,
+                        "message": f"Failed to set webhook: {set_result.get('description', 'Unknown error')}"
+                    }
+                    
+    except Exception as e:
+        logger.error(f"❌ Webhook fix error: {e}", exc_info=True)
+        return {
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }
+
 @app.get("/health")
 @app.head("/health")  # Support HEAD requests for UptimeRobot
 async def detailed_health():
