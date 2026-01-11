@@ -255,17 +255,18 @@ const PaymentSettings = () => {
                     onClick={handleFixWebhook}
                     disabled={webhookFixing}
                     className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${webhookFixing
-                            ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-900/50'
+                        ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg shadow-blue-900/50'
                         }`}
                 >
+                    {/* Trigger Vercel Rebuild */}
                     {webhookFixing ? '🔄 Fixing Webhook...' : '🔧 Fix Webhook Now'}
                 </button>
 
                 {webhookMessage && (
                     <div className={`mt-4 p-4 rounded-lg text-center font-medium ${webhookMessage.includes('✅')
-                            ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                            : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
                         }`}>
                         {webhookMessage}
                     </div>
