@@ -296,8 +296,17 @@ async def handle_check_membership(callback: types.CallbackQuery):
             setting = channel_setting.scalar_one_or_none()
             channel_link = setting.value if setting else "https://t.me/yourchannel"
         
-        await callback.answer("❌ You haven't joined yet!", show_alert=True)
-        await show_force_join_message(callback, channel_link)
+        # Explicit feedback: 1. Alert 2. Refresh Message
+        await callback.answer("❌ You have NOT joined the channel yet!\n\nPlease join and try again.", show_alert=True)
+        
+        # Refresh the message to ensure buttons are visible/clickable
+        # We delete and resend to make sure it's fresh and at the bottom
+        try:
+            await callback.message.delete()
+        except:
+            pass
+            
+        await show_force_join_message(callback.message, channel_link)
 
 @dp.callback_query(F.data == "btn_deposit")
 async def process_deposit_start(callback: types.CallbackQuery, state: FSMContext):
