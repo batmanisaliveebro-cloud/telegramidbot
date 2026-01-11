@@ -156,10 +156,16 @@ async def show_force_join_message(message_or_callback, channel_link: str):
     builder.row(InlineKeyboardButton(text="📢 Join Channel", url=channel_link))
     builder.row(InlineKeyboardButton(text="✅ Check Membership", callback_data="check_membership"))
     
-    if isinstance(message_or_callback, types.CallbackQuery):
-        await message_or_callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-    else:
-        await message_or_callback.answer(text,reply_markup=builder.as_markup(), parse_mode="HTML")
+    try:
+        if isinstance(message_or_callback, types.CallbackQuery):
+            await message_or_callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        else:
+            await message_or_callback.answer(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+    except Exception as e:
+        # Ignore "message is not modified" errors as that's expected behavior
+        if "message is not modified" not in str(e).lower():
+            logger.error(f"Error showing force join message: {e}")
+
 
 # --- Handlers ---
 
