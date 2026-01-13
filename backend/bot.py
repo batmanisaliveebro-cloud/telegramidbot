@@ -2822,42 +2822,56 @@ async def manage_devices_handler(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "btn_help")
 async def process_help_button(callback: types.CallbackQuery):
-    """Show support usage"""
+    """Show support info - ONLY shows values set by /setchannel and /setowner commands"""
     try:
         async with async_session() as session:
-            # Fetch Channel Link
+            # Fetch Channel Link - NO FALLBACK
             chan_stmt = select(Settings).where(Settings.key == "bot_channel_link")
             chan_res = await session.execute(chan_stmt)
             chan_setting = chan_res.scalar_one_or_none()
             
-            # Robust check: value must be truthy (not None and not empty string)
-            if chan_setting and chan_setting.value and str(chan_setting.value).strip():
-                channel_link = str(chan_setting.value).strip()
-            else:
-                channel_link = "https://t.me/akhilportal"
-            
-            # Fetch Owner Username
+            # Fetch Owner Username - NO FALLBACK
             owner_stmt = select(Settings).where(Settings.key == "bot_owner_username")
             owner_res = await session.execute(owner_stmt)
             owner_setting = owner_res.scalar_one_or_none()
             
-            if owner_setting and owner_setting.value and str(owner_setting.value).strip():
-                owner_username = str(owner_setting.value).strip()
-            else:
-                owner_username = "@akhilportal"
+            # Check if values are set
+            has_channel = chan_setting and chan_setting.value and str(chan_setting.value).strip()
+            has_owner = owner_setting and owner_setting.value and str(owner_setting.value).strip()
             
-            logger.info(f"Support Info: Link={channel_link}, Owner={owner_username}")
+            if not has_channel or not has_owner:
+                # NOT SET - Show error to admin
+                text = "⚠️ <b>Support Not Configured</b>\n\n"
+                text += "Admin needs to set support information using:\n\n"
+                text += "• <code>/setchannel</code> - Set channel link\n"
+                text += "• <code>/setowner</code> - Set owner username\n\n"
+                text += "<i>Contact admin to configure support.</i>"
+                
+                builder = InlineKeyboardBuilder()
+                builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
+                
+                await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+                await callback.answer("Support not configured", show_alert=True)
+                return
+            
+            # Values ARE set - show them
+            channel_link = str(chan_setting.value).strip()
+            owner_username = str(owner_setting.value).strip()
+            
+            logger.info(f"Support Info: Channel={channel_link}, Owner={owner_username}")
             
             text = "🆘 <b>Need Help?</b>\n\n"
-            text += f"📢 <b>Official Channel:</b> <a href='{channel_link}'>Join Here</a>\n"
-            text += f"👤 <b>Contact Support:</b> {owner_username}\n\n"
-            text += "<i>Click below to contact support directly.</i>"
+            text += f"📢 <b>Official Channel:</b>\n{channel_link}\n\n"
+            text += f"👤 <b>Contact Support:</b>\n{owner_username}\n\n"
+            text += "<i>Click below to visit our channel or contact support.</i>"
             
             builder = InlineKeyboardBuilder()
-            builder.row(InlineKeyboardButton(text="💬 Contact Support", url=channel_link))
+            builder.row(InlineKeyboardButton(text="📢 Join Channel", url=channel_link))
+            builder.row(InlineKeyboardButton(text="👤 Contact Owner", url=f"https://t.me/{owner_username.lstrip('@')}"))
             builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
             
-            await safe_edit_message(callback, text, reply_markup=builder.as_markup())
+            await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+            await callback.answer()
             
     except Exception as e:
         logger.error(f"Support button error: {e}")
@@ -3228,9 +3242,12 @@ async def process_owner_username(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "btn_broadcast")
 async def cmd_broadcast(callback: types.CallbackQuery, state: FSMContext):
     """Admin broadcast button handler"""
+    logger.info(f"Broadcast button clicked by user {callback.from_user.id}")
     admin_id = int(os.getenv("ADMIN_TELEGRAM_ID", "0"))
+    logger.info(f"Admin ID from env: {admin_id}")
     
     if callback.from_user.id != admin_id:
+        logger.warning(f"Non-admin {callback.from_user.id} tried to access broadcast")
         await callback.answer("❌ Admin only!", show_alert=True)
         return
     
