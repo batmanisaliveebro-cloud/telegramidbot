@@ -199,6 +199,21 @@ async def health_check():
     return {"status": "ok", "mode": "webhook", "service": "Telegram Bot Backend"}
 
 
+# === CRITICAL: WEBHOOK ENDPOINT ===
+from aiogram.types import Update
+
+@app.post(WEBHOOK_PATH)
+async def webhook_handler(update: dict):
+    """Receive and process Telegram updates"""
+    try:
+        telegram_update = Update(**update)
+        await dp.feed_update(bot=bot, update=telegram_update)
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}", exc_info=True)
+        return {"ok": False}
+
+
 @app.post("/api/fix-webhook")
 async def fix_webhook_endpoint():
     """
