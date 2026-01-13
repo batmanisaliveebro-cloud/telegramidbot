@@ -52,7 +52,7 @@ async def error_handler(event: types.ErrorEvent):
                 
                 if chat_id:
                     try:
-                        await bot.send_message(
+                        await message.bot.send_message(
                             chat_id,
                             "⚠️ An error occurred. Please try again or contact support if the issue persists.",
                             reply_markup=get_back_to_main()
@@ -197,7 +197,7 @@ async def safe_edit_message(callback, text, reply_markup=None, parse_mode="HTML"
         except:
             pass
         try:
-            await bot.send_message(callback.message.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode)
+            await message.bot.send_message(callback.message.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode)
         except Exception as send_err:
             logger.error(f"Could not send message after edit failed: {send_err}")
             await callback.answer("✅ Action completed", show_alert=False)
@@ -588,7 +588,7 @@ async def process_deposit_final_confirm(callback: types.CallbackQuery, state: FS
                 admin_id = os.getenv("ADMIN_TELEGRAM_ID")
                 if admin_id:
                     try:
-                        await bot.send_photo(
+                        await message.bot.send_photo(
                             chat_id=admin_id,
                             photo=photo_id,
                             caption=(
@@ -1213,7 +1213,7 @@ async def process_confirm_purchase(callback: types.CallbackQuery):
                 await callback.message.delete()
             except:
                 pass
-            await bot.send_message(
+            await message.bot.send_message(
                 callback.message.chat.id,
                 f"❌ <b>Insufficient Balance!</b>\n\n"
                 f"💰 Your Balance: ₹{user.balance}\n"
@@ -1242,7 +1242,7 @@ async def process_confirm_purchase(callback: types.CallbackQuery):
                 await callback.message.delete()
             except:
                 pass
-            await bot.send_message(
+            await message.bot.send_message(
                 callback.message.chat.id,
                 "❌ <b>Out of Stock!</b>\n\n"
                 f"Sorry, no {country.name} IDs available right now.",
@@ -1271,7 +1271,7 @@ async def process_confirm_purchase(callback: types.CallbackQuery):
             await callback.message.delete()
         except:
             pass
-        await bot.send_message(
+        await message.bot.send_message(
             callback.message.chat.id,
             f"✅ <b>Purchase Successful!</b>\n\n"
             f"📱 <b>Your Telegram ID:</b>\n"
@@ -1324,7 +1324,7 @@ async def process_get_otp(callback: types.CallbackQuery):
                 await callback.message.delete()
             except:
                 pass
-            await bot.send_message(
+            await message.bot.send_message(
                 callback.message.chat.id,
                 "❌ <b>Error!</b>\n\n"
                 "This account doesn't have session data configured.\n"
@@ -1353,7 +1353,7 @@ async def process_get_otp(callback: types.CallbackQuery):
                 pass  # If delete fails, just continue
             
             # Send new message with OTP waiting screen
-            new_message = await bot.send_message(
+            new_message = await message.bot.send_message(
                 callback.message.chat.id,
                 "🔄 <b>Starting OTP monitoring...</b>",
                 parse_mode="HTML"
@@ -1366,7 +1366,7 @@ async def process_get_otp(callback: types.CallbackQuery):
             logger.error(f"Error starting OTP monitoring: {e}")
             # Send error as new message instead of editing (CRITICAL FIX)
             try:
-                await bot.send_message(
+                await message.bot.send_message(
                     callback.message.chat.id,
                     f"❌ <b>Error!</b>\n\n"
                     f"Failed to start OTP monitoring: {str(e)}\n\n"
@@ -2199,7 +2199,7 @@ async def process_deposit_button(callback: types.CallbackQuery, state: FSMContex
 
     
 
-    await bot.send_message(
+    await message.bot.send_message(
 
         callback.message.chat.id,
 
@@ -2877,7 +2877,7 @@ async def process_broadcast_button(callback: types.CallbackQuery, state: FSMCont
         await callback.answer("❌ Admin only!", show_alert=True)
         return
 
-    await bot.send_message(
+    await message.bot.send_message(
         callback.message.chat.id,
         "📢 <b>Broadcast Message</b>\n\n"
         "Send the message you want to broadcast to all users.\n\n"
@@ -2923,25 +2923,25 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
         try:
             # Send message based on type
             if message.text:
-                await bot.send_message(
+                await message.bot.send_message(
                     user.telegram_id,
                     message.text,
                     parse_mode=message.html_text if hasattr(message, 'html_text') else None
                 )
             elif message.photo:
-                await bot.send_photo(
+                await message.bot.send_photo(
                     user.telegram_id,
                     message.photo[-1].file_id,
                     caption=message.caption or ""
                 )
             elif message.video:
-                await bot.send_video(
+                await message.bot.send_video(
                     user.telegram_id,
                     message.video.file_id,
                     caption=message.caption or ""
                 )
             elif message.document:
-                await bot.send_document(
+                await message.bot.send_document(
                     user.telegram_id,
                     message.document.file_id,
                     caption=message.caption or ""
@@ -3281,25 +3281,25 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
         try:
             # Send message based on type
             if message.text:
-                await bot.send_message(
+                await message.bot.send_message(
                     user.telegram_id,
                     message.text,
                     parse_mode=message.html_text if hasattr(message, 'html_text') else None
                 )
             elif message.photo:
-                await bot.send_photo(
+                await message.bot.send_photo(
                     user.telegram_id,
                     message.photo[-1].file_id,
                     caption=message.caption or ""
                 )
             elif message.video:
-                await bot.send_video(
+                await message.bot.send_video(
                     user.telegram_id,
                     message.video.file_id,
                     caption=message.caption or ""
                 )
             elif message.document:
-                await bot.send_document(
+                await message.bot.send_document(
                     user.telegram_id,
                     message.document.file_id,
                     caption=message.caption or ""
