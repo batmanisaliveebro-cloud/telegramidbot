@@ -3139,18 +3139,32 @@ async def process_channel_link(message: types.Message, state: FSMContext):
         return
     
     # Save to database
+    logger.info(f"Attempting to save channel link: {channel_link}")
     async with async_session() as session:
         stmt = select(Settings).where(Settings.key == "bot_channel_link")
         result = await session.execute(stmt)
         setting = result.scalar_one_or_none()
         
         if setting:
+            old_value = setting.value
             setting.value = channel_link
+            logger.info(f"Updated existing setting from '{old_value}' to '{channel_link}'")
         else:
             setting = Settings(key="bot_channel_link", value=channel_link)
             session.add(setting)
+            logger.info(f"Created new setting with value '{channel_link}'")
         
         await session.commit()
+        logger.info("✅ Database commit successful for channel_link")
+        
+        # Verify it was saved
+        verify_stmt = select(Settings).where(Settings.key == "bot_channel_link")
+        verify_result = await session.execute(verify_stmt)
+        verify_setting = verify_result.scalar_one_or_none()
+        if verify_setting and verify_setting.value == channel_link:
+            logger.info(f"✅ VERIFIED: Database has correct value: {verify_setting.value}")
+        else:
+            logger.error(f"❌ VERIFICATION FAILED: Database value doesn't match!")
     
     await state.clear()
     await message.answer(
@@ -3215,18 +3229,32 @@ async def process_owner_username(message: types.Message, state: FSMContext):
         return
     
     # Save to database
+    logger.info(f"Attempting to save owner username: {username}")
     async with async_session() as session:
         stmt = select(Settings).where(Settings.key == "bot_owner_username")
         result = await session.execute(stmt)
         setting = result.scalar_one_or_none()
         
         if setting:
+            old_value = setting.value
             setting.value = username
+            logger.info(f"Updated existing setting from '{old_value}' to '{username}'")
         else:
             setting = Settings(key="bot_owner_username", value=username)
             session.add(setting)
+            logger.info(f"Created new setting with value '{username}'")
         
         await session.commit()
+        logger.info("✅ Database commit successful for bot_owner_username")
+        
+        # Verify it was saved
+        verify_stmt = select(Settings).where(Settings.key == "bot_owner_username")
+        verify_result = await session.execute(verify_stmt)
+        verify_setting = verify_result.scalar_one_or_none()
+        if verify_setting and verify_setting.value == username:
+            logger.info(f"✅ VERIFIED: Database has correct value: {verify_setting.value}")
+        else:
+            logger.error(f"❌ VERIFICATION FAILED: Database value doesn't match!")
     
     await state.clear()
     await message.answer(
