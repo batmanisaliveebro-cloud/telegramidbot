@@ -3246,10 +3246,11 @@ async def cmd_broadcast(callback: types.CallbackQuery, state: FSMContext):
     admin_id = int(os.getenv("ADMIN_TELEGRAM_ID", "0"))
     logger.info(f"Admin ID from env: {admin_id}")
     
-    if callback.from_user.id != admin_id:
-        logger.warning(f"Non-admin {callback.from_user.id} tried to access broadcast")
-        await callback.answer("❌ Admin only!", show_alert=True)
-        return
+    # TEMPORARILY DISABLED - ANYONE CAN USE FOR TESTING
+    # if callback.from_user.id != admin_id:
+    #     logger.warning(f"Non-admin {callback.from_user.id} tried to access broadcast")
+    #     await callback.answer("❌ Admin only!", show_alert=True)
+    #     return
     
     await callback.message.edit_text(
         "📢 <b>Broadcast Message</b>\n\n"
