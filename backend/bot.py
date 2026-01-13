@@ -82,6 +82,10 @@ class BotSettingsStates(StatesGroup):
     waiting_for_channel_link = State()
     waiting_for_owner_username = State()
 
+class AdminConfigStates(StatesGroup):
+    waiting_for_channel = State()
+    waiting_for_owner = State()
+
 # --- Keyboards ---
 
 def get_main_menu(is_admin=False):
