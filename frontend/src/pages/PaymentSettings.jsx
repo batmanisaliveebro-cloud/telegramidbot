@@ -61,10 +61,44 @@ const PaymentSettings = () => {
         setSaving(true);
         setMessage('');
 
+        // Validate channel link
+        if (channelLink && channelLink.trim()) {
+            const channelLower = channelLink.toLowerCase();
+            if (channelLower.includes('yourchannel') || channelLower.includes('your_channel')) {
+                setMessage('❌ Please enter YOUR actual channel link, not the placeholder "yourchannel"!');
+                setSaving(false);
+                return;
+            }
+            if (!channelLink.startsWith('http')) {
+                setMessage('❌ Channel link must start with https://');
+                setSaving(false);
+                return;
+            }
+        }
+
+        // Validate owner username
+        if (ownerUsername && ownerUsername.trim()) {
+            const ownerLower = ownerUsername.toLowerCase();
+            if (ownerLower.includes('yourusername') || ownerLower.includes('your_username')) {
+                setMessage('❌ Please enter YOUR actual username, not "@yourusername"!');
+                setSaving(false);
+                return;
+            }
+            if (!ownerUsername.startsWith('@')) {
+                setMessage('❌ Owner username must start with @');
+                setSaving(false);
+                return;
+            }
+        }
+
         const formData = new FormData();
         formData.append('upi_id', upiId);
-        formData.append('channel_link', channelLink);
-        formData.append('owner_username', ownerUsername);
+        if (channelLink && channelLink.trim()) {
+            formData.append('channel_link', channelLink.trim());
+        }
+        if (ownerUsername && ownerUsername.trim()) {
+            formData.append('owner_username', ownerUsername.trim());
+        }
         if (qrImage) {
             formData.append('qr_image', qrImage);
         }
@@ -79,7 +113,8 @@ const PaymentSettings = () => {
             fetchSettings(); // Refresh to get server URLs
         } catch (error) {
             console.error("Error saving settings:", error);
-            setMessage('❌ Failed to save settings.');
+            const errorMsg = error.response?.data?.detail || 'Failed to save settings.';
+            setMessage(`❌ ${errorMsg}`);
         } finally {
             setSaving(false);
         }

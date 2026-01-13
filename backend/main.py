@@ -912,6 +912,40 @@ async def update_payment_settings(
 ):
     """Update UPI ID, Channel Link, Owner, and optionally upload new QR Code"""
     try:
+        # Validate and reject placeholder values
+        PLACEHOLDER_CHANNELS = ["yourchannel", "@yourchannel", "your_channel"]
+        PLACEHOLDER_OWNERS = ["@yourusername", "yourusername", "@your_username", "your_username"]
+        
+        if channel_link:
+            channel_lower = channel_link.lower().strip()
+            # Check if it's a placeholder
+            if any(p in channel_lower for p in PLACEHOLDER_CHANNELS):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="❌ Please enter YOUR actual channel link, not the placeholder text!"
+                )
+            # Check if it's a valid URL
+            if not channel_link.startswith("http"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="❌ Channel link must start with https://"
+                )
+        
+        if owner_username:
+            owner_lower = owner_username.lower().strip()
+            # Check if it's a placeholder
+            if any(p in owner_lower for p in PLACEHOLDER_OWNERS):
+                raise HTTPException(
+                    status_code=400,
+                    detail="❌ Please enter YOUR actual username, not '@yourusername'!"
+                )
+            # Check if it starts with @
+            if not owner_username.startswith("@"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="❌ Owner username must start with @"
+                )
+        
         async with async_session() as session:
             # Update UPI ID
             stmt = select(Settings).where(Settings.key == "payment_upi_id")
@@ -922,7 +956,7 @@ async def update_payment_settings(
             else:
                 setting.value = upi_id
             
-            # Update Channel Link
+            # Update Channel Link (only if provided and valid)
             if channel_link:
                 stmt = select(Settings).where(Settings.key == "bot_channel_link")
                 res = await session.execute(stmt)
@@ -931,8 +965,9 @@ async def update_payment_settings(
                     session.add(Settings(key="bot_channel_link", value=channel_link))
                 else:
                     setting.value = channel_link
+                logger.info(f"✅ Updated bot_channel_link to: {channel_link}")
             
-            # Update Owner Username
+            # Update Owner Username (only if provided and valid)
             if owner_username:
                 stmt = select(Settings).where(Settings.key == "bot_owner_username")
                 res = await session.execute(stmt)
@@ -941,6 +976,7 @@ async def update_payment_settings(
                     session.add(Settings(key="bot_owner_username", value=owner_username))
                 else:
                     setting.value = owner_username
+                logger.info(f"✅ Updated bot_owner_username to: {owner_username}")
             
             # Handle QR Image Upload if provided
             if qr_image:
