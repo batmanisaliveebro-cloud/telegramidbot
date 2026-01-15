@@ -2919,7 +2919,7 @@ async def process_broadcast_button(callback: types.CallbackQuery, state: FSMCont
         await callback.answer("❌ Admin only!", show_alert=True)
         return
 
-    await message.bot.send_message(
+    await callback.bot.send_message(
         callback.message.chat.id,
         "📢 <b>Broadcast Message</b>\n\n"
         "Send the message you want to broadcast to all users.\n\n"
