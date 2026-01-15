@@ -406,14 +406,30 @@ app.add_middleware(
 
 # Admin API and Frontend serving below
 
-@app.post("/admin/login")
-async def admin_login(req: LoginRequest):
-    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-    print(f"🔐 Login Attempt: Input='{req.password}' | Env='{admin_pass}'") # DEBUG LOG
-    if req.password.strip() == admin_pass.strip():
-        return {"status": "success", "token": "admin_token"} # Simple token for now
-    print("❌ Password mismatch")
-    raise HTTPException(status_code=401, detail="Invalid password")
+@app.post("/api/login")
+async def login(request: LoginRequest):
+    """Admin login endpoint - reads password from ADMIN_PASSWORD env var"""
+    try:
+        # Get admin password from environment variable
+        admin_password = os.getenv("ADMIN_PASSWORD", "admin123")  # Default fallback
+        
+        logger.info(f"🔐 Login attempt with password: {request.password[:3]}***")
+        logger.info(f"🔐 Expected password from env: {admin_password[:3]}***")
+        
+        # Check password
+        if request.password == admin_password:
+            logger.info("✅ Login successful!")
+            # Create a simple token (in production, use proper JWT)
+            token = "admin_token_" + str(hash(admin_password))
+            return {"token": token, "success": True}
+        else:
+            logger.warning("❌ Login failed - incorrect password")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Login error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
 
 # --- Admin API Routes ---
 
