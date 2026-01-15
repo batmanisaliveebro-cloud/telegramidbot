@@ -96,8 +96,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.on_event("startup")
-async def startup_event():
+# Duplicate startup_event REMOVED - webhook setup now in lifespan only
+
+
     """
     CRITICAL: Set up webhook when app starts
     This ensures the bot ALWAYS responds, even after deployments
