@@ -2822,66 +2822,89 @@ async def manage_devices_handler(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "btn_help")
 async def process_help_button(callback: types.CallbackQuery):
-    """Handle support button - PRIORITIZES ENVIRONMENT VARIABLES, falls back to database"""
-    
-    # STEP 1: Try to get from ENVIRONMENT VARIABLES (Koyeb)
-    channel_link = os.getenv("BOT_CHANNEL_LINK", "").strip()
-    owner_username = os.getenv("BOT_OWNER_USERNAME", "").strip()
-    
-    logger.info(f"🔍 ENV CHECK - Channel: '{channel_link}', Owner: '{owner_username}'")
-    
-    # STEP 2: If not in env vars, try database as fallback
-    if not channel_link or not owner_username:
-        logger.warning("⚠️ Environment variables not set, checking database...")
-        async with async_session() as session:
-            if not channel_link:
-                chan_stmt = select(Settings).where(Settings.key == "bot_channel_link")
-                chan_res = await session.execute(chan_stmt)
-                chan_setting = chan_res.scalar_one_or_none()
-                if chan_setting and chan_setting.value:
-                    channel_link = str(chan_setting.value).strip()
-                    logger.info(f"📊 Found channel in database: {channel_link}")
+    """Handle support button - BULLETPROOF version with full error handling"""
+    try:
+        # STEP 1: Try to get from ENVIRONMENT VARIABLES (Koyeb)
+        channel_link = os.getenv("BOT_CHANNEL_LINK", "").strip()
+        owner_username = os.getenv("BOT_OWNER_USERNAME", "").strip()
+        
+        logger.info(f"🔍 ENV CHECK - Channel: '{channel_link}', Owner: '{owner_username}'")
+        
+        # STEP 2: If not in env vars, try database as fallback
+        if not channel_link or not owner_username:
+            logger.warning("⚠️ Environment variables not set, checking database...")
+            try:
+                async with async_session() as session:
+                    if not channel_link:
+                        chan_stmt = select(Settings).where(Settings.key == "bot_channel_link")
+                        chan_res = await session.execute(chan_stmt)
+                        chan_setting = chan_res.scalar_one_or_none()
+                        if chan_setting and chan_setting.value:
+                            channel_link = str(chan_setting.value).strip()
+                            logger.info(f"📊 Found channel in database: {channel_link}")
+                    
+                    if not owner_username:
+                        owner_stmt = select(Settings).where(Settings.key == "bot_owner_username")
+                        owner_res = await session.execute(owner_stmt)
+                        owner_setting = owner_res.scalar_one_or_none()
+                        if owner_setting and owner_setting.value:
+                            owner_username = str(owner_setting.value).strip()
+                            logger.info(f"📊 Found owner in database: {owner_username}")
+            except Exception as db_error:
+                logger.error(f"❌ Database error in support handler: {db_error}")
+                # Continue anyway with whatever values we have
+        else:
+            logger.info("✅ Using values from ENVIRONMENT VARIABLES!")
+        
+        # STEP 3: Build response
+        if channel_link or owner_username:
+            text = "🆘 <b>Support & Contact</b>\n\n"
             
-            if not owner_username:
-                owner_stmt = select(Settings).where(Settings.key == "bot_owner_username")
-                owner_res = await session.execute(owner_stmt)
-                owner_setting = owner_res.scalar_one_or_none()
-                if owner_setting and owner_setting.value:
-                    owner_username = str(owner_setting.value).strip()
-                    logger.info(f"📊 Found owner in database: {owner_username}")
-    else:
-        logger.info("✅ Using values from ENVIRONMENT VARIABLES!")
-    
-    # STEP 3: Build response
-    if channel_link or owner_username:
-        text = "🆘 <b>Support & Contact</b>\n\n"
+            if channel_link:
+                text += f"📢 <b>Official Channel:</b>\n{channel_link}\n\n"
+            
+            if owner_username:
+                text += f"👤 <b>Contact Support:</b>\n{owner_username}\n\n"
+            
+            text += "We're here to help! 💙"
+        else:
+            # If neither is set anywhere
+            text = (
+                "🆘 <b>Support</b>\n\n"
+                "⚠️ Support contact information not configured.\n\n"
+                "Admin: Set BOT_CHANNEL_LINK and BOT_OWNER_USERNAME\n"
+                "in Koyeb environment variables."
+            )
+            logger.error("❌ NO SUPPORT INFO FOUND - Not in env vars OR database!")
         
-        if channel_link:
-            text += f"📢 <b>Official Channel:</b>\n{channel_link}\n\n"
-        
-        if owner_username:
-            text += f"👤 <b>Contact Support:</b>\n{owner_username}\n\n"
-        
-        text += "We're here to help! 💙"
-    else:
-        # If neither is set anywhere
-        text = (
-            "🆘 <b>Support</b>\n\n"
-            "⚠️ Support contact information not configured.\n\n"
-            "Admin: Set BOT_CHANNEL_LINK and BOT_OWNER_USERNAME\n"
-            "in Koyeb environment variables."
-        )
-        logger.error("❌ NO SUPPORT INFO FOUND - Not in env vars OR database!")
-    
-    keyboard = InlineKeyboardBuilder()
-    keyboard.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
-    
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboard.as_markup(),
-        parse_mode="HTML"
-    )
-    await callback.answer()
+        # STEP 4: Send response with error handling
+        try:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
+            
+            await callback.message.edit_text(
+                text,
+                reply_markup=keyboard.as_markup(),
+                parse_mode="HTML"
+            )
+            await callback.answer()
+            logger.info("✅ Support handler completed successfully")
+        except Exception as send_error:
+            logger.error(f"❌ Error sending support message: {send_error}")
+            # Try to at least answer the callback to prevent timeout
+            try:
+                await callback.answer("❌ Error displaying support info", show_alert=True)
+            except:
+                pass  # If even this fails, just log it
+                
+    except Exception as e:
+        # ULTIMATE FALLBACK - catch ANY error
+        logger.error(f"❌ CRITICAL ERROR in support handler: {e}", exc_info=True)
+        try:
+            # Try to send a simple error message
+            await callback.answer("❌ Support temporarily unavailable", show_alert=True)
+        except:
+            pass  # If this fails too, bot won't crash
 
 # Broadcast States (defined locally to avoid import issues)
 class BroadcastMessageStates(StatesGroup):
