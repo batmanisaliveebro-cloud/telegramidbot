@@ -2822,15 +2822,37 @@ async def manage_devices_handler(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "btn_help")
 async def process_help_button(callback: types.CallbackQuery):
-    """Handle support button - uses ENVIRONMENT VARIABLES"""
+    """Handle support button - PRIORITIZES ENVIRONMENT VARIABLES, falls back to database"""
     
-    # Get values from ENVIRONMENT VARIABLES (set on Koyeb)
+    # STEP 1: Try to get from ENVIRONMENT VARIABLES (Koyeb)
     channel_link = os.getenv("BOT_CHANNEL_LINK", "").strip()
     owner_username = os.getenv("BOT_OWNER_USERNAME", "").strip()
     
-    logger.info(f"Support requested - Channel: {channel_link}, Owner: {owner_username}")
+    logger.info(f"🔍 ENV CHECK - Channel: '{channel_link}', Owner: '{owner_username}'")
     
-    # Build response
+    # STEP 2: If not in env vars, try database as fallback
+    if not channel_link or not owner_username:
+        logger.warning("⚠️ Environment variables not set, checking database...")
+        async with async_session() as session:
+            if not channel_link:
+                chan_stmt = select(Settings).where(Settings.key == "bot_channel_link")
+                chan_res = await session.execute(chan_stmt)
+                chan_setting = chan_res.scalar_one_or_none()
+                if chan_setting and chan_setting.value:
+                    channel_link = str(chan_setting.value).strip()
+                    logger.info(f"📊 Found channel in database: {channel_link}")
+            
+            if not owner_username:
+                owner_stmt = select(Settings).where(Settings.key == "bot_owner_username")
+                owner_res = await session.execute(owner_stmt)
+                owner_setting = owner_res.scalar_one_or_none()
+                if owner_setting and owner_setting.value:
+                    owner_username = str(owner_setting.value).strip()
+                    logger.info(f"📊 Found owner in database: {owner_username}")
+    else:
+        logger.info("✅ Using values from ENVIRONMENT VARIABLES!")
+    
+    # STEP 3: Build response
     if channel_link or owner_username:
         text = "🆘 <b>Support & Contact</b>\n\n"
         
@@ -2842,12 +2864,14 @@ async def process_help_button(callback: types.CallbackQuery):
         
         text += "We're here to help! 💙"
     else:
-        # If neither is set, show clear message
+        # If neither is set anywhere
         text = (
             "🆘 <b>Support</b>\n\n"
             "⚠️ Support contact information not configured.\n\n"
-            "Please contact the bot administrator."
+            "Admin: Set BOT_CHANNEL_LINK and BOT_OWNER_USERNAME\n"
+            "in Koyeb environment variables."
         )
+        logger.error("❌ NO SUPPORT INFO FOUND - Not in env vars OR database!")
     
     keyboard = InlineKeyboardBuilder()
     keyboard.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
