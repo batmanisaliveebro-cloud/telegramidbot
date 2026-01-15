@@ -431,6 +431,12 @@ async def login(request: LoginRequest):
         logger.error(f"❌ Login error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
 
+# COMPATIBILITY: Also support /admin/login endpoint (frontend uses this)
+@app.post("/admin/login")
+async def admin_login(request: LoginRequest):
+    """Admin login - compatibility endpoint, calls main login function"""
+    return await login(request)
+
 # --- Admin API Routes ---
 
 @app.get("/admin/countries")
