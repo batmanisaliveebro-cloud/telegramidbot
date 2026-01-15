@@ -131,7 +131,14 @@ async def fix_webhook_endpoint():
         logger = logging.getLogger(__name__)
         
         bot_token = os.getenv("BOT_TOKEN")
-        webhook_url = os.getenv("WEBHOOK_URL", "https://doubtful-chelsae-decstorroyal-43b44335.koyeb.app/webhook")
+        base_url = os.getenv("BASE_WEBHOOK_URL")
+        
+        if not base_url:
+            logger.error("❌ BASE_WEBHOOK_URL not set in environment!")
+            return {"success": False, "error": "BASE_WEBHOOK_URL not configured"}
+        
+        webhook_url = f"{base_url.rstrip('/')}/webhook"
+        logger.info(f"🔧 Admin requested webhook fix to: {webhook_url}")
         
         async with aiohttp.ClientSession() as session:
             # Delete old webhook
