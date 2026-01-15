@@ -46,9 +46,8 @@ class BalanceAdjustment(BaseModel):
 
 # Webhook Configuration
 WEBHOOK_PATH = "/webhook"
-# BASE_URL from env var (for Railway/Render), default to actual Koyeb URL if missing
-# This is the PERMANENT FIX ensuring webhook is always set correct on boot
-BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", "https://shallow-reggie-telegrambotmine-8d891f24.koyeb.app")
+# BASE_WEBHOOK_URL must be set as environment variable on Koyeb
+# Example: BASE_WEBHOOK_URL=https://your-app-name.koyeb.app
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,28 +56,33 @@ async def lifespan(app: FastAPI):
     
     # Set Webhook on Startup with error handling
     try:
-        webhook_url = f"{BASE_WEBHOOK_URL.rstrip('/')}{WEBHOOK_PATH}"
-        print(f"🔄 Setting webhook to: {webhook_url}", flush=True)
+        base_url = os.getenv("BASE_WEBHOOK_URL")
         
-        await bot.set_webhook(
-            url=webhook_url,
-            allowed_updates=dp.resolve_used_update_types(),
-            drop_pending_updates=True
-        )
-        
-        # Verify Webhook
-        info = await bot.get_webhook_info()
-        print(f"✅ Webhook set successfully!", flush=True)
-        print(f"   URL: {info.url}", flush=True)
-        print(f"   Pending updates: {info.pending_update_count}", flush=True)
-        
-        if info.last_error_message:
-            print(f"⚠️ Last webhook error: {info.last_error_message}", flush=True)
-            print(f"   Error date: {info.last_error_date}", flush=True)
+        if not base_url:
+            print("❌ ERROR: BASE_WEBHOOK_URL environment variable not set!", flush=True)
+            print("   Set it on Koyeb to your app URL", flush=True)
+        else:
+            webhook_url = f"{base_url.rstrip('/')}{WEBHOOK_PATH}"
+            print(f"🔄 Setting webhook to: {webhook_url}", flush=True)
+            
+            await bot.set_webhook(
+                url=webhook_url,
+                allowed_updates=dp.resolve_used_update_types(),
+                drop_pending_updates=True
+            )
+            
+            # Verify Webhook
+            info = await bot.get_webhook_info()
+            print(f"✅ Webhook set successfully!", flush=True)
+            print(f"   URL: {info.url}", flush=True)
+            print(f"   Pending updates: {info.pending_update_count}", flush=True)
+            
+            if info.last_error_message:
+                print(f"⚠️ Last webhook error: {info.last_error_message}", flush=True)
+                print(f"   Error date: {info.last_error_date}", flush=True)
             
     except Exception as e:
         print(f"❌ WEBHOOK ERROR: {e}", flush=True)
-        print(f"   URL attempted: {BASE_WEBHOOK_URL if 'BASE_WEBHOOK_URL' in locals() else 'NOT SET'}", flush=True)
         print(f"   Bot will continue but webhook may not work!", flush=True)
     
     yield
