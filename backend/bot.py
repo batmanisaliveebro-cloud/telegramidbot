@@ -2822,7 +2822,9 @@ async def manage_devices_handler(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "btn_help")
 async def process_help_button(callback: types.CallbackQuery):
-    """Handle support button - BULLETPROOF version with full error handling"""
+    """Handle support button - BULLETPROOF# Telegram Bot with Bulletproof Error Handling
+# Last Updated: 2026-01-16 02:18 - Force rebuild
+"""
     try:
         # STEP 1: Try to get from ENVIRONMENT VARIABLES (Koyeb)
         channel_link = os.getenv("BOT_CHANNEL_LINK", "").strip()
