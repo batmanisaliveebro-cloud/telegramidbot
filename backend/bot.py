@@ -984,22 +984,6 @@ async def process_purchase_history(callback: types.CallbackQuery):
     builder.row(InlineKeyboardButton(text="🔙 Back to Profile", callback_data="btn_profile"))
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-@dp.callback_query(F.data == "btn_help")
-async def process_help(callback: types.CallbackQuery):
-    text = (
-        "<b>❓ Need Help?</b>\n\n"
-        "⚡ <b>We have the fastest customer support!</b>\n\n"
-        "If you have any issues with your purchase or deposit, "
-        "feel free to contact us. Our team is online 24/7."
-    )
-    
-    builder = InlineKeyboardBuilder()
-    builder.row(InlineKeyboardButton(text="📢 Our Channel", url="https://t.me/YourChannel"))
-    builder.row(InlineKeyboardButton(text="👨‍💻 Bot Owner", url="https://t.me/YourSupportUser"))
-    builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
-    
-    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
-
 
 @dp.callback_query(F.data == "btn_main_menu")
 async def process_main_menu(callback: types.CallbackQuery, state: FSMContext):
