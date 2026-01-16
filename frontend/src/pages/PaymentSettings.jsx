@@ -324,6 +324,7 @@ const PaymentSettings = () => {
             </div>
         </div>
 
+
         {/* Redeploy Modal */ }
     {
         showRedeployModal && (
@@ -393,7 +394,7 @@ const PaymentSettings = () => {
             </div>
         )
     }
-    </div >
+        </div >
     );
 };
 
