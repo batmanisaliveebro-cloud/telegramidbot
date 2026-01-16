@@ -744,7 +744,7 @@ async def process_country_selection(callback: types.CallbackQuery):
             callback_data=f"confirm_buy_{country_id}"
         ))
         builder.row(InlineKeyboardButton(
-            text="❌ Cancel",
+            text="🔙 Back",
             callback_data="btn_accounts"
         ))
         builder.row(InlineKeyboardButton(
@@ -828,53 +828,47 @@ async def confirm_purchase_handler(callback: types.CallbackQuery):
             session.add(purchase)
             await session.commit()
             await session.refresh(user)
+            await session.refresh(purchase)
         
-        # Success message with OTP CODE
+        # Show purchase success with OTP button (DELETE+SEND to prevent crash)
+        try:
+            await callback.message.delete()
+        except:
+            pass
+        
         text = "🎉 <b>Purchase Successful!</b>\n\n"
         text += f"📱 <b>Phone Number:</b> <code>{account.phone_number}</code>\n"
         if account.twofa_password:
             text += f"🔐 <b>2FA Password:</b> <code>{account.twofa_password}</code>\n"
         
-        # Fetch REAL OTP code
-        otp_code = "⏳ Fetching..."
-        try:
-            from backend.otp_fetcher import get_latest_otp_code
-            api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
-            api_hash = os.getenv("TELEGRAM_API_HASH", "")
-            
-            if account.session_data and api_id and api_hash:
-                fetched_code = await get_latest_otp_code(account.session_data, api_id, api_hash)
-                if fetched_code:
-                    otp_code = f"🔢 {fetched_code}"  # Add emoji to code
-                else:
-                    otp_code = "Check Telegram app"
-            else:
-                otp_code = "Check Telegram app"
-        except Exception as e:
-            logger.error(f"OTP fetch error in purchase: {e}")
-            otp_code = "Check Telegram app"
-        
-        text += f"\n📨 <b>Login Code:</b> <code>{otp_code}</code>\n"
-        text += "<i>(Tap 'Retry Code' if not received)</i>\n"
-        
         text += f"\n💰 <b>Amount Paid:</b> ₹{country.price}\n"
         text += f"💵 <b>New Balance:</b> ₹{user.balance}\n\n"
-        text += "📋 <b>Next Steps:</b>\n1. Use the phone number to login\n2. Enter the code above\n3. Enter 2FA password if prompted\n\n✅ Account saved in your purchase history!"
+        text += "📋 <b>How to Login:</b>\n"
+        text += "1️⃣ Open Telegram app\n"
+        text += "2️⃣ Enter the phone number above\n"
+        text += "3️⃣ Telegram will ask for OTP\n"
+        text += "4️⃣ Click '📲 Get OTP Code' below\n\n"
+        text += "✅ Account saved in your purchase history!"
         
         builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(text="🔄 Retry Code", callback_data=f"retry_code_{account.id}"))
-        builder.row(InlineKeyboardButton(text="📱 Manage Devices", callback_data=f"manage_devices_{account.id}"))
-        builder.row(InlineKeyboardButton(text="📜 My Purchases", callback_data="btn_my_purchases"))
+        builder.row(InlineKeyboardButton(text="📲 Get OTP Code", callback_data=f"get_otp_{purchase.id}"))
+        builder.row(InlineKeyboardButton(text="📱 Manage Devices", callback_data=f"manage_sess_{purchase.id}"))
+        builder.row(InlineKeyboardButton(text="📜 My Purchases", callback_data="btn_purchases"))
         builder.row(InlineKeyboardButton(text="🛒 Buy More", callback_data="btn_accounts"))
         builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
         
-        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await message.bot.send_message(
+            callback.message.chat.id,
+            text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )
         logger.info(f"✅ Purchase: User {user.telegram_id} bought {account.phone_number} for ₹{country.price}")
         
     except Exception as e:
         logger.error(f"❌ Purchase error: {e}", exc_info=True)
-        await callback.message.edit_text(
-            "❌ <b>Purchase Failed!</b>\n\nAn error occurred. Please contact support.\nYour balance was not deducted.",
+        await callback.message.answer(
+            "❌ <b>Purchase Failed!</b>\n\nAn error occurred. Please contact support.",
             reply_markup=get_back_to_main(),
             parse_mode="HTML"
         )
@@ -1170,118 +1164,6 @@ async def process_session_country(callback: types.CallbackQuery):
         
         await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
 
-# --- Purchase Confirmation Handler ---
-
-@dp.callback_query(F.data.startswith("confirm_buy_"))
-async def process_confirm_purchase(callback: types.CallbackQuery):
-    """Process purchase after user confirms"""
-    country_id = int(callback.data.split("_")[2])
-    
-    async with async_session() as session:
-        # Get user
-        user_stmt = select(User).where(User.telegram_id == callback.from_user.id)
-        user_res = await session.execute(user_stmt)
-        user = user_res.scalar_one_or_none()
-        
-        # Get country
-        country_stmt = select(Country).where(Country.id == country_id)
-        country_res = await session.execute(country_stmt)
-        country = country_res.scalar_one_or_none()
-        
-        if not user or not country:
-            await callback.answer("Error: User or country not found")
-            return
-        
-        # Check if user has sufficient balance
-        if user.balance < country.price:
-            try:
-                await callback.message.delete()
-            except:
-                pass
-            await message.bot.send_message(
-                callback.message.chat.id,
-                f"❌ <b>Insufficient Balance!</b>\n\n"
-                f"💰 Your Balance: ₹{user.balance}\n"
-                f"💵 Required: ₹{country.price}\n"
-                f"💸 Short by: ₹{country.price - user.balance}\n\n"
-                "Please deposit to continue.",
-                reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="💰 Deposit", callback_data="btn_deposit"))
-                    .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
-                    .as_markup(),
-                parse_mode="HTML"
-            )
-            return
-        
-        # Find available account
-        account_stmt = select(Account).where(
-            Account.country_id == country_id,
-            Account.is_sold == False,
-            Account.type == "ID"
-        ).limit(1)
-        account_res = await session.execute(account_stmt)
-        account = account_res.scalar_one_or_none()
-        
-        if not account:
-            try:
-                await callback.message.delete()
-            except:
-                pass
-            await message.bot.send_message(
-                callback.message.chat.id,
-                "❌ <b>Out of Stock!</b>\n\n"
-                f"Sorry, no {country.name} IDs available right now.",
-                reply_markup=InlineKeyboardBuilder()
-                    .row(InlineKeyboardButton(text="🔙 Back", callback_data="btn_accounts"))
-                    .as_markup(),
-                parse_mode="HTML"
-            )
-            return
-        
-        # Process purchase
-        user.balance -= country.price
-        account.is_sold = True
-        
-        purchase = Purchase(
-            user_id=user.id,
-            account_id=account.id,
-            amount=country.price
-        )
-        session.add(purchase)
-        await session.commit()
-        await session.refresh(purchase)
-        
-        # Show purchase success with OTP button (DELETE+SEND to prevent crash)
-        try:
-            await callback.message.delete()
-        except:
-            pass
-        await message.bot.send_message(
-            callback.message.chat.id,
-            f"✅ <b>Purchase Successful!</b>\n\n"
-            f"📱 <b>Your Telegram ID:</b>\n"
-            f"<code>{account.phone_number}</code>\n\n"
-            f"💰 <b>Paid:</b> ₹{country.price}\n"
-            f"💳 <b>Remaining Balance:</b> ₹{user.balance}\n\n"
-            f"📋 <b>How to Login:</b>\n"
-            f"1️⃣ Open Telegram app\n"
-            f"2️⃣ Enter the phone number above\n"
-            f"3️⃣ Telegram will ask for OTP\n"
-            f"4️⃣ Click 'Get OTP Code' below\n"
-            f"5️⃣ We'll send you the code instantly!\n\n"
-            f"👇 <b>Ready to receive OTP?</b>",
-            reply_markup=InlineKeyboardBuilder()
-                .row(InlineKeyboardButton(
-                    text="📲 Get OTP Code",
-                    callback_data=f"get_otp_{purchase.id}"
-                ))
-                .row(InlineKeyboardButton(
-                    text="🏠 Main Menu",
-                    callback_data="btn_main_menu"
-                ))
-                .as_markup(),
-            parse_mode="HTML"
-        )
 
 
 @dp.callback_query(F.data.startswith("get_otp_"))
@@ -1341,6 +1223,9 @@ async def process_get_otp(callback: types.CallbackQuery):
             new_message = await message.bot.send_message(
                 callback.message.chat.id,
                 "🔄 <b>Starting OTP monitoring...</b>",
+                reply_markup=InlineKeyboardBuilder()
+                    .row(InlineKeyboardButton(text="🔙 Back", callback_data=f"manage_sess_{purchase_id}"))
+                    .as_markup(),
                 parse_mode="HTML"
             )
             
@@ -1671,8 +1556,8 @@ async def process_manage_session(callback: types.CallbackQuery):
                 
                 # Build device button with X for removal
                 if not is_current:
-                    # Format: "Device Name     ❌"
-                    btn_text = f"{sess['device_model'][:20]}... ❌"
+                    # Format: "Logout: Device Name"
+                    btn_text = f"🛑 Logout: {sess['device_model'][:15]}"
                     builder.row(InlineKeyboardButton(
                         text=btn_text,
                         callback_data=f"kill_sess_{purchase_id}_{sess['hash']}"
@@ -3011,11 +2896,13 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
             except Exception:
                 failed_count += 1
         except TelegramAPIError as e:
-            logger.error(f"❌ Telegram API Error for {user.telegram_id}: {e}")
+            if "chat not found" in str(e).lower() or "user is deactivated" in str(e).lower():
+                logger.warning(f"🗑️ User {user.telegram_id} deleted chat or is deactivated")
+            else:
+                logger.error(f"❌ Telegram API Error for {user.telegram_id}: {e}")
             failed_count += 1
         except Exception as e:
             logger.error(f"❓ Unexpected failure for {user.telegram_id}: {e}")
-            # If it's a critical connection error, we might want to break, but for now we continue
             failed_count += 1
     
     # Final status
@@ -3023,8 +2910,8 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
         f"✅ <b>Broadcast Complete!</b>\n\n"
         f"Total users: {len(users)}\n"
         f"✅ Successfully sent: {success_count}\n"
-        f"❌ Failed: {failed_count}\n\n"
-        f"💡 <i>Users who blocked the bot were skipped.</i>",
+        f"❌ Failed/Skipped: {failed_count}\n\n"
+        f"💡 <i>Includes users who blocked bot or deleted chat.</i>",
         parse_mode="HTML"
     )
 
