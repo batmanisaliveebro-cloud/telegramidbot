@@ -322,79 +322,75 @@ const PaymentSettings = () => {
                     No need to restart the bot!
                 </p>
             </div>
-        </div>
 
+            {/* Redeploy Modal */}
+            {showRedeployModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-gray-800 rounded-2xl border border-gray-700 max-w-2xl w-full p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-2xl font-bold text-white">🚀 Redeploy Bot on Koyeb</h3>
+                            <button onClick={() => setShowRedeployModal(false)} className="text-gray-400 hover:text-white text-2xl">
+                                ✕
+                            </button>
+                        </div>
 
-        {/* Redeploy Modal */ }
-    {
-        showRedeployModal && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                <div className="bg-gray-800 rounded-2xl border border-gray-700 max-w-2xl w-full p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-2xl font-bold text-white">🚀 Redeploy Bot on Koyeb</h3>
-                        <button onClick={() => setShowRedeployModal(false)} className="text-gray-400 hover:text-white text-2xl">
-                            ✕
-                        </button>
-                    </div>
+                        <div className="space-y-4 text-gray-300">
+                            <p className="text-lg">Follow these steps to redeploy your bot:</p>
 
-                    <div className="space-y-4 text-gray-300">
-                        <p className="text-lg">Follow these steps to redeploy your bot:</p>
+                            <div className="bg-gray-900/50 rounded-lg p-4 space-y-3">
+                                <div className="flex items-start space-x-3">
+                                    <span className="text-2xl">1️⃣</span>
+                                    <div>
+                                        <p className="font-semibold text-white">Go to Koyeb Dashboard</p>
+                                        <a href="https://app.koyeb.com" target="_blank" rel="noopener noreferrer"
+                                            className="text-blue-400 hover:text-blue-300 underline">
+                                            https://app.koyeb.com
+                                        </a>
+                                    </div>
+                                </div>
 
-                        <div className="bg-gray-900/50 rounded-lg p-4 space-y-3">
-                            <div className="flex items-start space-x-3">
-                                <span className="text-2xl">1️⃣</span>
-                                <div>
-                                    <p className="font-semibold text-white">Go to Koyeb Dashboard</p>
-                                    <a href="https://app.koyeb.com" target="_blank" rel="noopener noreferrer"
-                                        className="text-blue-400 hover:text-blue-300 underline">
-                                        https://app.koyeb.com
-                                    </a>
+                                <div className="flex items-start space-x-3">
+                                    <span className="text-2xl">2️⃣</span>
+                                    <div>
+                                        <p className="font-semibold text-white">Find Your Bot Service</p>
+                                        <p className="text-sm">Click on your bot service in the list</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start space-x-3">
+                                    <span className="text-2xl">3️⃣</span>
+                                    <div>
+                                        <p className="font-semibold text-white">Click "Redeploy"</p>
+                                        <p className="text-sm">Or click the three dots (⋮) → "Redeploy"</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start space-x-3">
+                                    <span className="text-2xl">4️⃣</span>
+                                    <div>
+                                        <p className="font-semibold text-white">Wait for Deployment</p>
+                                        <p className="text-sm">Usually takes 2-3 minutes</p>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-start space-x-3">
-                                <span className="text-2xl">2️⃣</span>
-                                <div>
-                                    <p className="font-semibold text-white">Find Your Bot Service</p>
-                                    <p className="text-sm">Click on your bot service in the list</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start space-x-3">
-                                <span className="text-2xl">3️⃣</span>
-                                <div>
-                                    <p className="font-semibold text-white">Click "Redeploy"</p>
-                                    <p className="text-sm">Or click the three dots (⋮) → "Redeploy"</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start space-x-3">
-                                <span className="text-2xl">4️⃣</span>
-                                <div>
-                                    <p className="font-semibold text-white">Wait for Deployment</p>
-                                    <p className="text-sm">Usually takes 2-3 minutes</p>
-                                </div>
+                            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
+                                <p className="text-blue-300">
+                                    💡 <strong>Tip:</strong> After redeploying, your bot will restart with all the latest changes!
+                                </p>
                             </div>
                         </div>
 
-                        <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-                            <p className="text-blue-300">
-                                💡 <strong>Tip:</strong> After redeploying, your bot will restart with all the latest changes!
-                            </p>
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={() => setShowRedeployModal(false)}
+                                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors">
+                                Close
+                            </button>
                         </div>
-                    </div>
-
-                    <div className="mt-6 flex justify-end">
-                        <button onClick={() => setShowRedeployModal(false)}
-                            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors">
-                            Close
-                        </button>
                     </div>
                 </div>
-            </div>
-        )
-    }
-        </div >
+            )}
+        </div>
     );
 };
 
