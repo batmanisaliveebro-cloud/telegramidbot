@@ -31,6 +31,10 @@ engine = create_async_engine(
 async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 async def init_db():
-    async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all) # Careful with this
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            # await conn.run_sync(Base.metadata.drop_all) # Careful with this
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ DATABASE: Successfully connected to Supabase/Postgres!", flush=True)
+    except Exception as e:
+        print(f"❌ DATABASE ERROR: Could not connect to database: {e}", flush=True)

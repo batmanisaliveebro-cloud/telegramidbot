@@ -8,6 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter, TelegramAPIError
 from dotenv import load_dotenv
 from .database import async_session
 from .models import User, Country, Account, Purchase, Deposit, Settings
@@ -2978,7 +2979,7 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
             
             success_count += 1
             
-            # Update every 10 users
+            # Update status for large broadcasts (every 10 users)
             if success_count % 10 == 0:
                 try:
                     await status_msg.edit_text(
@@ -2988,14 +2989,33 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
                         f"⏳ Remaining: {len(users) - success_count - failed_count}",
                         parse_mode="HTML"
                     )
-                except:
-                    pass  # Ignore "message not modified" errors
+                except Exception:
+                    pass  # Ignore "message is not modified"
             
-            # Delay to avoid rate limits (Telegram allows ~30 messages/second)
-            await asyncio.sleep(0.04)
+            # Respect Telegram's broadcast limits (~30 msg/sec)
+            await asyncio.sleep(0.05)
             
+        except TelegramForbiddenError:
+            logger.error(f"🚫 User {user.telegram_id} blocked the bot")
+            failed_count += 1
+        except TelegramRetryAfter as e:
+            logger.warning(f"⏳ Rate limited. Waiting {e.retry_after}s")
+            await asyncio.sleep(e.retry_after)
+            # Re-attempt once after retry delay
+            try:
+                if message.text:
+                    await message.bot.send_message(user.telegram_id, message.html_text if hasattr(message, 'html_text') else message.text, parse_mode="HTML")
+                elif message.photo:
+                    await message.bot.send_photo(user.telegram_id, message.photo[-1].file_id, caption=message.caption or "")
+                success_count += 1
+            except Exception:
+                failed_count += 1
+        except TelegramAPIError as e:
+            logger.error(f"❌ Telegram API Error for {user.telegram_id}: {e}")
+            failed_count += 1
         except Exception as e:
-            logger.error(f"Broadcast failed to {user.telegram_id}: {e}")
+            logger.error(f"❓ Unexpected failure for {user.telegram_id}: {e}")
+            # If it's a critical connection error, we might want to break, but for now we continue
             failed_count += 1
     
     # Final status
