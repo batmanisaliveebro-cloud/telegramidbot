@@ -998,14 +998,8 @@ async def process_purchase_history(callback: types.CallbackQuery):
                     text += f"{i}. {emoji} <b>{country_name}</b>\n"
                     text += f"   📱 <code>{account.phone_number}</code>\n"
                     text += f"   💰 ₹{purchase.amount} • {purchase.created_at.strftime('%d %b %Y')}\n\n"
-                    
-                    # Add button for each purchase
-                    builder.row(InlineKeyboardButton(
-                        text=f"⚙️ Manage: {account.phone_number}",
-                        callback_data=f"manage_sess_{purchase.id}"
-                    ))
             
-            # Add control buttons
+            # Add control buttons (no individual manage buttons - keep it clean)
             builder.row(InlineKeyboardButton(text="🛒 Buy More", callback_data="btn_accounts"))
             builder.row(InlineKeyboardButton(text="👤 Profile", callback_data="btn_profile"))
             builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
