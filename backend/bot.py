@@ -1272,21 +1272,25 @@ async def process_get_otp(callback: types.CallbackQuery):
             
         except Exception as e:
             logger.error(f"Error starting OTP monitoring: {e}")
-            # Send error as new message instead of editing (CRITICAL FIX)
-            try:
-                await callback.bot.send_message(
-                    callback.message.chat.id,
-                    f"❌ <b>Error!</b>\n\n"
-                    f"Failed to start OTP monitoring: {str(e)}\n\n"
-                    "Please try again or contact support.",
-                    reply_markup=InlineKeyboardBuilder()
-                        .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
-                        .as_markup(),
-                    parse_mode="HTML"
-                )
-            except Exception as send_err:
-                logger.error(f"Could not send error message: {send_err}")
-                await callback.answer("❌ Error occurred. Please try again.", show_alert=True)
+            # Only show error if it's NOT a "message is not modified" error
+            if "message is not modified" not in str(e).lower():
+                try:
+                    await callback.bot.send_message(
+                        callback.message.chat.id,
+                        f"❌ <b>Error!</b>\n\n"
+                        f"Failed to start OTP monitoring.\n\n"
+                        "Please try again or contact support.",
+                        reply_markup=InlineKeyboardBuilder()
+                            .row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
+                            .as_markup(),
+                        parse_mode="HTML"
+                    )
+                except Exception as send_err:
+                    logger.error(f"Could not send error message: {send_err}")
+                    await callback.answer("❌ Error occurred. Please try again.", show_alert=True)
+            else:
+                # Silent ignore for "message is not modified" - it's harmless
+                logger.debug(f"Ignoring harmless 'message is not modified' error")
 
 
 async def show_otp_waiting(message: types.Message, phone_number: str, purchase_id: int, attempt: int = 0):
@@ -1359,13 +1363,17 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
         text += f"🔄 <i>Auto-detecting login status...</i>\n"
         text += f"💡 <i>Click 'Resend Code' if needed</i>"
         
-        # OTP received, show it with resend button
+        # OTP received, show it with resend and manage devices buttons
         await message.edit_text(
             text,
             reply_markup=InlineKeyboardBuilder()
                 .row(InlineKeyboardButton(
                     text="🔄 Resend Code",
                     callback_data=f"resend_otp_{purchase_id}"
+                ))
+                .row(InlineKeyboardButton(
+                    text="🛠️ Manage Devices",
+                    callback_data=f"manage_sess_{purchase_id}"
                 ))
                 .row(InlineKeyboardButton(
                     text="⏹️ Stop Monitoring",
@@ -1403,6 +1411,7 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
                 text,
                 reply_markup=InlineKeyboardBuilder()
                     .row(InlineKeyboardButton(text="🔍 Check Code", callback_data=f"check_otp_{purchase_id}"))
+                    .row(InlineKeyboardButton(text="🛠️ Manage Devices", callback_data=f"manage_sess_{purchase_id}"))
                     .row(InlineKeyboardButton(text="⏹️ Stop Waiting", callback_data="btn_main_menu"))
                     .as_markup(),
                 parse_mode="HTML"
@@ -1412,6 +1421,7 @@ async def show_otp_waiting(message: types.Message, phone_number: str, purchase_i
                 text,
                 reply_markup=InlineKeyboardBuilder()
                     .row(InlineKeyboardButton(text="🔍 Check Code", callback_data=f"check_otp_{purchase_id}"))
+                    .row(InlineKeyboardButton(text="🛠️ Manage Devices", callback_data=f"manage_sess_{purchase_id}"))
                     .row(InlineKeyboardButton(text="⏹️ Stop Waiting", callback_data="btn_main_menu"))
                     .as_markup(),
                 parse_mode="HTML"
