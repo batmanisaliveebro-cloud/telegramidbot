@@ -32,8 +32,10 @@ class DeviceManager:
             logger.info("Connecting to Telegram to fetch sessions...")
             await client.connect()
             
-            # Fetch authorizations (active sessions)
-            authorizations = await client.get_authorizations()
+            # Fetch authorizations (active sessions) using Pyrogram's raw API
+            from pyrogram.raw.functions.account import GetAuthorizations
+            authorizations_obj = await client.invoke(GetAuthorizations())
+            authorizations = authorizations_obj.authorizations
             
             # Get current session info to identify "This Device"
             me = await client.get_me()
@@ -42,20 +44,24 @@ class DeviceManager:
             # Filter/Process
             results = []
             for auth in authorizations:
+                # Format dates safely
+                date_created = datetime.fromtimestamp(auth.date_created) if hasattr(auth, 'date_created') else None
+                date_active = datetime.fromtimestamp(auth.date_active) if hasattr(auth, 'date_active') else None
+                
                 results.append({
                     "hash": auth.hash,
-                    "device_model": auth.device_model,
-                    "platform": auth.platform,
-                    "system_version": auth.system_version,
+                    "device_model": getattr(auth, 'device_model', 'Unknown'),
+                    "platform": getattr(auth, 'platform', 'Unknown'),
+                    "system_version": getattr(auth, 'system_version', 'Unknown'),
                     "api_id": auth.api_id,
                     "app_name": auth.app_name,
                     "app_version": auth.app_version,
-                    "date_created": auth.date_created,
-                    "date_active": auth.date_active,
+                    "date_created": date_created,
+                    "date_active": date_active,
                     "ip": auth.ip,
                     "country": auth.country,
-                    "region": auth.region,
-                    "is_current": auth.hash == 0 # Pyrogram sometimes returns 0 for current, or we match differently
+                    "region": getattr(auth, 'region', ''),
+                    "is_current": getattr(auth, 'current', False)
                 })
                 
             return results
@@ -82,8 +88,9 @@ class DeviceManager:
             logger.info(f"Connecting to terminate session hash: {hash_id}")
             await client.connect()
             
-            # Delete authorization
-            await client.delete_authorization(hash_id)
+            # Delete authorization using Pyrogram's raw API
+            from pyrogram.raw.functions.account import ResetAuthorization
+            await client.invoke(ResetAuthorization(hash=hash_id))
             return True
         except Exception as e:
             logger.error(f"Error terminating session: {e}")
