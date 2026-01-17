@@ -74,7 +74,7 @@ class DeviceManager:
                 await client.disconnect()
 
     async def terminate_session(self, session_string: str, hash_id: int):
-        """Terminate a specific session by hash"""
+        """Terminate a specific session by hash - ACTUALLY logs out the device"""
         client = Client(
             name="temp_device_kill",
             api_id=self.api_id,
@@ -85,13 +85,26 @@ class DeviceManager:
         )
         
         try:
-            logger.info(f"Connecting to terminate session hash: {hash_id}")
+            logger.info(f"🔌 Connecting to Telegram to terminate session hash: {hash_id}")
             await client.connect()
             
             # Delete authorization using Pyrogram's raw API
-            from pyrogram.raw.functions.account import ResetAuthorization
-            await client.invoke(ResetAuthorization(hash=hash_id))
-            return True
+            from pyrogram.raw.functions.account import ResetAuthorization, GetAuthorizations
+            logger.info(f"🛑 Calling ResetAuthorization for hash: {hash_id}")
+            result = await client.invoke(ResetAuthorization(hash=hash_id))
+            logger.info(f"✅ ResetAuthorization completed. Result: {result}")
+            
+            # Verify termination worked by checking if hash still exists
+            logger.info(f"🔍 Verifying session {hash_id} was actually terminated...")
+            check_obj = await client.invoke(GetAuthorizations())
+            remaining_hashes = [auth.hash for auth in check_obj.authorizations]
+            
+            if hash_id in remaining_hashes:
+                logger.error(f"❌ LOGOUT FAILED: Session {hash_id} still exists!")
+                raise Exception(f"Session {hash_id} was not terminated")
+            else:
+                logger.info(f"✅ CONFIRMED: Session {hash_id} successfully terminated!")
+                return True
         except Exception as e:
             logger.error(f"Error terminating session: {e}")
             raise e
