@@ -381,26 +381,27 @@ async def add_account(account: AccountCreate):
 
 @app.get("/admin/stats")
 async def get_admin_stats():
+    """Get dashboard statistics using efficient SQL aggregations"""
     async with async_session() as session:
-        # Total Users
-        users_stmt = select(User)
-        users_res = await session.execute(users_stmt)
-        total_users = len(users_res.scalars().all())
+        # Use SQL COUNT instead of loading all users into memory
+        from sqlalchemy import func
         
-        # Total Sales (sum of all purchases)
-        purchases_stmt = select(Purchase.amount)
-        purchases_res = await session.execute(purchases_stmt)
-        total_sales = sum(purchases_res.scalars().all())
+        # Total Users - use COUNT
+        users_count = await session.scalar(select(func.count(User.id)))
         
-        # Pending Deposits
-        pending_stmt = select(Deposit).where(Deposit.status == "PENDING")
-        pending_res = await session.execute(pending_stmt)
-        pending_deposits = len(pending_res.scalars().all())
+        # Total Sales - use SUM aggregation
+        total_sales_result = await session.scalar(select(func.sum(Purchase.amount)))
+        total_sales = total_sales_result if total_sales_result else 0
+        
+        # Pending Deposits - use COUNT with filter
+        pending_count = await session.scalar(
+            select(func.count(Deposit.id)).where(Deposit.status == "PENDING")
+        )
         
         return {
-            "total_users": total_users,
-            "total_sales": total_sales,
-            "pending_deposits": pending_deposits
+            "total_users": users_count or 0,
+            "total_sales": float(total_sales),
+            "pending_deposits": pending_count or 0
         }
 
 @app.get("/admin/settings/payment")
