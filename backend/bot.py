@@ -678,8 +678,8 @@ async def process_accounts(callback: types.CallbackQuery):
     builder.row(InlineKeyboardButton(text="🏠 Main Menu", callback_data="btn_main_menu"))
     
     await callback.message.edit_text(
-        "🛍️ <b>Select a country to buy IDs:</b>\n\n"
-        "Only showing countries with available stock.",
+        "🌐 <b> Select Country to Buy IDs 🛒</b>\n\n"
+        "✅ Showing Only Countries With Available Stock 📦",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
