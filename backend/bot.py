@@ -1667,7 +1667,18 @@ async def process_kill_session(callback: types.CallbackQuery):
                 
         except Exception as e:
             logger.error(f"Error killing session: {e}")
-            await callback.answer(f"❌ Error: {str(e)}", show_alert=True)
+            
+            # Check if it's Telegram's "fresh login" security restriction
+            error_msg = str(e).lower()
+            if "fresh_reset_authorisation_forbidden" in error_msg or "logged-in recently" in error_msg:
+                await callback.answer(
+                    "🔒 Security Restriction\n\n"
+                    "Telegram doesn't allow logging out other devices for 24 hours after a fresh login.\n\n"
+                    "⏰ Please try again tomorrow!",
+                    show_alert=True
+                )
+            else:
+                await callback.answer(f"❌ Error: {str(e)}", show_alert=True)
 """
 
 Complete Deposit Flow for Telegram Bot
