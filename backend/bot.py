@@ -1598,7 +1598,7 @@ async def process_manage_session(callback: types.CallbackQuery):
                 return
                 
             text = f"📱 <b>Active Sessions for {account.phone_number}</b>\n\n"
-            text += "<i>Click '❌' to revoke a device instantly.</i>\n\n"
+            text += "<i>Tap 🛑 Logout to remove any device below.</i>\n\n"
             
             for sess in sessions:
                 # Mark current session (Bot)
@@ -1611,7 +1611,7 @@ async def process_manage_session(callback: types.CallbackQuery):
                     text += " (Current)"
                 text += f"\n   └ IP: {sess['ip']}\n\n"
 
-            text += f"💡 <i>Tap 🛑 to remove a device</i>\n"
+            text += f"💡 <i>Logout other devices to secure your account</i>\n"
             
             builder = InlineKeyboardBuilder()
             # Add Logout buttons for other sessions
@@ -1644,7 +1644,7 @@ async def process_kill_session(callback: types.CallbackQuery):
     purchase_id = int(parts[2])
     session_hash = int(parts[3])
     
-    await callback.answer("Revoking access...", show_alert=False)
+    await callback.answer("Logging out device...", show_alert=False)
     
     async with async_session() as session:
         # Get Account
@@ -1665,15 +1665,15 @@ async def process_kill_session(callback: types.CallbackQuery):
             success = await dm.terminate_session(account.session_data, session_hash)
             
             if success:
-                await callback.answer("✅ Device revoked successfully!", show_alert=True)
+                await callback.answer("✅ Device logged out successfully!", show_alert=True)
                 # Refresh list
                 await process_manage_session(callback)
             else:
-                await callback.answer("❌ Failed to revoke.", show_alert=True)
+                await callback.answer("❌ Failed to logout device.", show_alert=True)
                 
         except Exception as e:
             logger.error(f"Error killing session: {e}")
-            await callback.answer(f"Error: {str(e)}", show_alert=True)
+            await callback.answer(f"❌ Error: {str(e)}", show_alert=True)
 """
 
 Complete Deposit Flow for Telegram Bot
