@@ -725,17 +725,12 @@ async def process_country_selection(callback: types.CallbackQuery):
         # Show confirmation with phone number and disclaimer
         text = f"🏴 <b>Country:</b> {country.emoji} {country.name}\n"
         text += f"💵 <b>Price:</b> ₹{country.price}\n"
-        text += f"📱 <b>Phone Number:</b> <code>{preview_account.phone_number}</code>\n"
         text += f"📦 <b>Stock:</b> {available_stock} available\n\n"
         text += "⚠️ <b>IMPORTANT DISCLAIMER:</b>\n"
         text += "• We are NOT responsible for banned/frozen accounts\n"
         text += "• No refunds for account restrictions\n"
         text += "• Use at your own risk\n"
         text += "• Follow Telegram's Terms of Service\n\n"
-        text += "💡 <b>You will receive:</b>\n"
-        text += "• Phone number\n"
-        text += "• OTP codes automatically\n"
-        text += "• Login assistance\n\n"
         text += "✅ <b>Confirm purchase?</b>"
         
         builder = InlineKeyboardBuilder()
