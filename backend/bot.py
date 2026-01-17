@@ -1480,7 +1480,16 @@ async def process_resend_otp(callback: types.CallbackQuery):
         # Active check to get the new code immediately
         await session_mgr.check_latest_otp(account.phone_number)
         
-        await show_otp_waiting(callback.message, account.phone_number, purchase_id)
+        # Call show_otp_waiting with error handling
+        try:
+            await show_otp_waiting(callback.message, account.phone_number, purchase_id)
+        except Exception as e:
+            # Silently ignore "message is not modified" errors
+            if "message is not modified" not in str(e).lower():
+                logger.error(f"Error in resend OTP: {e}")
+                await callback.answer("❌ Error checking code. Please try again.", show_alert=True)
+            else:
+                logger.debug("Ignoring harmless 'message is not modified' error in resend_otp")
 # Handler for manual OTP check
 @dp.callback_query(F.data.startswith("check_otp_"))
 async def handle_check_otp(callback: types.CallbackQuery):
