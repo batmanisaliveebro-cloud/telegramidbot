@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Body, Path
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -354,6 +354,19 @@ async def delete_country(country_id: int):
         await session.execute(delete(Country).where(Country.id == country_id))
         await session.commit()
         return {"message": "Country deleted"}
+
+@app.put("/admin/countries/{country_id}")
+async def update_country(country_id: int, price: float = Body(..., embed=True)):
+    async with async_session() as session:
+        result = await session.execute(select(Country).where(Country.id == country_id))
+        db_country = result.scalar_one_or_none()
+        if not db_country:
+            raise HTTPException(status_code=404, detail="Country not found")
+        
+        db_country.price = price
+        await session.commit()
+        await session.refresh(db_country)
+        return db_country
 
 @app.get("/admin/accounts")
 async def get_accounts():

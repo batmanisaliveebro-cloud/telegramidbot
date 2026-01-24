@@ -96,6 +96,8 @@ const Countries = () => {
     const [countries, setCountries] = useState([]);
     const [newCountry, setNewCountry] = useState({ name: '', emoji: '', price: '' });
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [editPrice, setEditPrice] = useState('');
 
     useEffect(() => {
         fetchCountries();
@@ -120,6 +122,19 @@ const Countries = () => {
         if (window.confirm('Are you sure you want to delete this country?')) {
             await axios.delete(`${API_BASE}/admin/countries/${id}`);
             fetchCountries();
+        }
+    };
+
+    const handleUpdatePrice = async (id) => {
+        try {
+            await axios.put(`${API_BASE}/admin/countries/${id}`, {
+                price: parseFloat(editPrice)
+            });
+            setEditingId(null);
+            fetchCountries();
+        } catch (error) {
+            console.error('Error updating price:', error);
+            alert('Failed to update price');
         }
     };
 
@@ -209,15 +224,53 @@ const Countries = () => {
                                     <span className="text-3xl">{country.emoji}</span>
                                     <div>
                                         <p className="text-white font-medium">{country.name}</p>
-                                        <p className="text-gray-400 text-sm">₹{country.price}</p>
+                                        {editingId === country.id ? (
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={editPrice}
+                                                    onChange={e => setEditPrice(e.target.value)}
+                                                    className="w-24 bg-gray-600 border-none rounded-lg px-2 py-1 text-white text-sm ring-1 ring-gray-500 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    onClick={() => handleUpdatePrice(country.id)}
+                                                    className="text-green-500 hover:text-green-400 text-sm font-medium"
+                                                >
+                                                    Save
+                                                </button>
+                                                <button
+                                                    onClick={() => setEditingId(null)}
+                                                    className="text-gray-400 hover:text-white text-sm font-medium"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-400 text-sm">₹{country.price}</p>
+                                        )}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDelete(country.id)}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                                >
-                                    Delete
-                                </button>
+                                <div className="flex gap-2">
+                                    {editingId !== country.id && (
+                                        <button
+                                            onClick={() => {
+                                                setEditingId(country.id);
+                                                setEditPrice(country.price);
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleDelete(country.id)}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             </div>
                         ))
                     )}
